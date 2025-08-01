@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,7 +9,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	cli "github.com/urfave/cli/v2"
+	cli "github.com/urfave/cli/v3"
 	"go.uber.org/zap"
 
 	"sync2kindle/config"
@@ -18,19 +19,21 @@ import (
 	"sync2kindle/sync"
 )
 
-func beforeAppRun(ctx *cli.Context) (err error) {
-	if ctx.NArg() == 0 {
-		return nil
-	}
-	env := ctx.Generic(state.FlagName).(*state.LocalEnv)
+func beforeAppRun(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+	var err error
 
-	configFile := ctx.String("config")
-	if env.Cfg, err = config.LoadConfiguration(configFile); err != nil {
-		return fmt.Errorf("unable to prepare configuration: %w", err)
+	if cmd.NArg() == 0 {
+		return ctx, nil
 	}
-	if ctx.Bool("debug") {
+	env := ctx.Value(state.EnvValue).(*state.LocalEnv)
+
+	configFile := cmd.String("config")
+	if env.Cfg, err = config.LoadConfiguration(configFile); err != nil {
+		return ctx, fmt.Errorf("unable to prepare configuration: %w", err)
+	}
+	if cmd.Bool("debug") {
 		if env.Rpt, err = env.Cfg.Reporting.Prepare(); err != nil {
-			return fmt.Errorf("unable to prepare debug reporter: %w", err)
+			return ctx, fmt.Errorf("unable to prepare debug reporter: %w", err)
 		}
 		// save complete processed configuration if external configuration was provided
 		if len(configFile) > 0 {
@@ -41,7 +44,7 @@ func beforeAppRun(ctx *cli.Context) (err error) {
 		}
 	}
 	if env.Log, err = env.Cfg.Logging.Prepare(env.Rpt); err != nil {
-		return fmt.Errorf("unable to prepare logs: %w", err)
+		return ctx, fmt.Errorf("unable to prepare logs: %w", err)
 	}
 	env.RestoreStdLog = zap.RedirectStdLog(env.Log)
 
@@ -49,32 +52,33 @@ func beforeAppRun(ctx *cli.Context) (err error) {
 	if env.Rpt != nil {
 		env.Log.Info("Creating debug report", zap.String("location", env.Rpt.Name()))
 	}
-	return nil
+	return ctx, nil
 }
 
-func afterAppRun(ctx *cli.Context) error {
-	env := ctx.Generic(state.FlagName).(*state.LocalEnv)
+func afterAppRun(ctx context.Context, cmd *cli.Command) error {
+	env := ctx.Value(state.EnvValue).(*state.LocalEnv)
 	if env.Log != nil {
-		env.Log.Debug("Program ended", zap.Duration("elapsed", time.Since(env.Start)), zap.Strings("parsed args", ctx.Args().Slice()))
+		env.Log.Debug("Program ended", zap.Duration("elapsed", time.Since(env.Start)), zap.Strings("parsed args", cmd.Args().Slice()))
 	}
 	return nil
 }
 
-func beforeCmdRun(ctx *cli.Context) (err error) {
-	env := ctx.Generic(state.FlagName).(*state.LocalEnv)
+func beforeCmdRun(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+	env := ctx.Value(state.EnvValue).(*state.LocalEnv)
 
-	configFile := ctx.String("config")
+	configFile := cmd.String("config")
 	if len(configFile) == 0 && env.Log != nil {
 		env.Log.Info("Using defaults (no configuration file)")
 	}
-	return nil
+	return ctx, nil
 }
 
 func main() {
 
 	env := state.NewLocalEnv()
+	ctx := context.WithValue(context.Background(), state.EnvValue, env)
 
-	app := &cli.App{
+	app := &cli.Command{
 		Name:            "s2k",
 		Usage:           "synchronizing local books with supported kindle device over MTP protocol, USBMS mount or using e-mail",
 		Version:         misc.GetVersion() + " (" + runtime.Version() + ") : " + misc.GetGitHash(),
@@ -82,7 +86,6 @@ func main() {
 		Before:          beforeAppRun,
 		After:           afterAppRun,
 		Flags: []cli.Flag{
-			&cli.GenericFlag{Name: state.FlagName, Hidden: true, Value: env},
 			&cli.StringFlag{Name: "config", Aliases: []string{"c"}, DefaultText: "", Usage: "load configuration from `FILE` (YAML)"},
 			&cli.BoolFlag{Name: "debug", Aliases: []string{"d"}, Usage: "changes program behavior to help troubleshooting"},
 		},
@@ -175,7 +178,7 @@ To see actual "active" configuration use dry-run mode.
 		},
 	}
 
-	err := app.Run(os.Args)
+	err := app.Run(ctx, os.Args)
 	if err != nil {
 		if env.Log != nil {
 			env.Log.Error("Command ended with error", zap.Error(err))
@@ -215,14 +218,14 @@ To see actual "active" configuration use dry-run mode.
 	}
 }
 
-func outputConfiguration(ctx *cli.Context) error {
+func outputConfiguration(ctx context.Context, cmd *cli.Command) error {
 
-	env := ctx.Generic(state.FlagName).(*state.LocalEnv)
-	if ctx.Args().Len() > 1 {
-		env.Log.Warn("Malformed command line, too many destinations", zap.Strings("ignoring", ctx.Args().Slice()[1:]))
+	env := ctx.Value(state.EnvValue).(*state.LocalEnv)
+	if cmd.Args().Len() > 1 {
+		env.Log.Warn("Malformed command line, too many destinations", zap.Strings("ignoring", cmd.Args().Slice()[1:]))
 	}
 
-	fname := ctx.Args().Get(0)
+	fname := cmd.Args().Get(0)
 
 	var (
 		err   error
@@ -240,7 +243,7 @@ func outputConfiguration(ctx *cli.Context) error {
 
 	}
 
-	if ctx.Bool("dry-run") {
+	if cmd.Bool("dry-run") {
 		state = "active"
 		data, err = config.Dump(env.Cfg)
 	} else {

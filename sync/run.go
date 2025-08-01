@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -8,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	cli "github.com/urfave/cli/v2"
+	cli "github.com/urfave/cli/v3"
 	"go.uber.org/zap"
 
 	"sync2kindle/common"
@@ -21,20 +22,20 @@ import (
 	"sync2kindle/usbms"
 )
 
-func RunUSB(ctx *cli.Context) error {
-	return Sync(ctx, common.ProtocolUSB)
+func RunUSB(ctx context.Context, cmd *cli.Command) error {
+	return sync(ctx, cmd, common.ProtocolUSB)
 }
 
-func RunMTP(ctx *cli.Context) error {
-	return Sync(ctx, common.ProtocolMTP)
+func RunMTP(ctx context.Context, cmd *cli.Command) error {
+	return sync(ctx, cmd, common.ProtocolMTP)
 }
 
-func RunMail(ctx *cli.Context) error {
-	return Sync(ctx, common.ProtocolMail)
+func RunMail(ctx context.Context, cmd *cli.Command) error {
+	return sync(ctx, cmd, common.ProtocolMail)
 }
 
-func Sync(ctx *cli.Context, protocol common.SupportedProtocols) error {
-	env := ctx.Generic(state.FlagName).(*state.LocalEnv)
+func sync(ctx context.Context, cmd *cli.Command, protocol common.SupportedProtocols) error {
+	env := ctx.Value(state.EnvValue).(*state.LocalEnv)
 	log := env.Log.Named("sync")
 
 	if protocol == common.ProtocolMail {
@@ -92,7 +93,7 @@ func Sync(ctx *cli.Context, protocol common.SupportedProtocols) error {
 
 	// Target: device
 
-	dev, err := connectDevice(ctx, protocol, env)
+	dev, err := connectDevice(cmd, protocol, env)
 	if err != nil {
 		return fmt.Errorf("unable to connect to device: %w", err)
 	}
@@ -131,7 +132,7 @@ func Sync(ctx *cli.Context, protocol common.SupportedProtocols) error {
 
 	// See if anything needs to be done
 
-	actions, localBooks, err := PrepareActions(src, dev, hst, env.Cfg, ctx.Bool("ignore-device-removals"), protocol == common.ProtocolMail, log)
+	actions, localBooks, err := PrepareActions(src, dev, hst, env.Cfg, cmd.Bool("ignore-device-removals"), protocol == common.ProtocolMail, log)
 	if err != nil {
 		return fmt.Errorf("unable to prepare sync actions: %w", err)
 	}
@@ -141,7 +142,7 @@ func Sync(ctx *cli.Context, protocol common.SupportedProtocols) error {
 
 	// do the work
 
-	dryRun := ctx.Bool("dry-run")
+	dryRun := cmd.Bool("dry-run")
 	for _, action := range actions {
 		if err := action(dryRun, log); err != nil {
 			return fmt.Errorf("action failed: %w", err)
@@ -159,18 +160,18 @@ func Sync(ctx *cli.Context, protocol common.SupportedProtocols) error {
 	return nil
 }
 
-func connectDevice(ctx *cli.Context, protocol common.SupportedProtocols, env *state.LocalEnv) (driver, error) {
+func connectDevice(cmd *cli.Command, protocol common.SupportedProtocols, env *state.LocalEnv) (driver, error) {
 	switch protocol {
 	case common.ProtocolUSB:
 		return usbms.Connect(
 			strings.Join([]string{env.Cfg.TargetPath, common.ThumbnailFolder}, string(filepath.ListSeparator)),
-			env.Cfg.DeviceSerial, ctx.Bool("unmount") && !ctx.Bool("dry-run"), env.Log.Named("sync"))
+			env.Cfg.DeviceSerial, cmd.Bool("unmount") && !cmd.Bool("dry-run"), env.Log.Named("sync"))
 	case common.ProtocolMTP:
 		return mtp.Connect(
 			strings.Join([]string{env.Cfg.TargetPath, common.ThumbnailFolder}, string(filepath.ListSeparator)),
-			env.Cfg.DeviceSerial, ctx.Bool("debug"), env.Log.Named("sync"))
+			env.Cfg.DeviceSerial, cmd.Bool("debug"), env.Log.Named("sync"))
 	case common.ProtocolMail:
-		debug := ctx.Bool("debug")
+		debug := cmd.Bool("debug")
 		if debug {
 			mailDir, err := os.MkdirTemp("", "s2k-m-")
 			if err != nil {

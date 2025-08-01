@@ -1,11 +1,12 @@
 package history
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	cli "github.com/urfave/cli/v2"
+	cli "github.com/urfave/cli/v3"
 	"go.uber.org/zap"
 	"zombiezen.com/go/sqlite"
 	"zombiezen.com/go/sqlite/sqlitex"
@@ -13,8 +14,8 @@ import (
 	"sync2kindle/state"
 )
 
-func RunList(ctx *cli.Context) error {
-	env := ctx.Generic(state.FlagName).(*state.LocalEnv)
+func RunList(ctx context.Context, cmd *cli.Command) error {
+	env := ctx.Value(state.EnvValue).(*state.LocalEnv)
 	log := env.Log.Named(driverName)
 
 	entries, err := os.ReadDir(env.Cfg.HistoryPath)

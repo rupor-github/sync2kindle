@@ -23,10 +23,10 @@ func NewLocalEnv() *LocalEnv {
 	return &LocalEnv{Start: time.Now()}
 }
 
-// In "github.com/urfave/cli" the only way I found to share state between "app" and "command" without global variables
-// is to use hidden GenericFlag. To implement the mechanics we need following code...
+type LocalEnvKeyType string
+
 const (
-	FlagName = "$-localenv-$"
+	EnvValue LocalEnvKeyType = "$-localenv-$"
 )
 
 // Set implements cli's flag interface
