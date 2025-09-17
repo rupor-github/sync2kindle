@@ -5,20 +5,20 @@ gencfg
 Combination of importable module and a CLI tool on top of it to simplify dealing
 with YAML configuration files in Go code.
 
-Rather than using 3rd party packages to handle configuration today
-it's preferable to use Go built in support for marshaling and struct tags.
-Taking into account requirements of local development and testing it's difficult
-to prevent logic of configuration from spreading across multiple source files
-and sometimes modules. This module provides tooling to solve this problem to a
-degree allowing most of the logic (including setting defaults) to be in the
-configuration template (possibly embedded into resulting binary). 
+Rather than using 3rd party packages to handle configuration lately it seems
+preferable to use Go built in support for marshaling and struct tags. Taking
+into account requirements of local development and testing it's difficult to
+prevent configuration logic from spreading across your code. Package
+provides some tooling to solve this problem to a degree allowing most of the
+logic (including setting defaults) to be in the configuration template
+(possibly embedded into resulting binary). 
 
 It introduces an ability to use [Go Templating engine](https://golang.org/pkg/text/template/)
 with added support for [slim-sprig lib](https://go-task.github.io/slim-sprig/)
-and some "proprietary" extensions to derive "values" in the configuration. This
+and some small extensions to derive "values" in the configuration. This
 makes it possible to both generate configuration files and to create
 configurations for production usage, development and testing in a coherent way
-from single template.
+hopefully from a single configuration template.
 
 ## Template variables defined by project
 
@@ -31,14 +31,92 @@ from single template.
     .CPUs (int) - Go's runtime.NumCPU()
     .OS (string) - Go's runtime.GOOS
     .ARCH (string) - Go's runtime.GOARCH
-    .Agguments (map[strting]string) - could be passed to Process() using .WithArgument(name,value) calls
+    .Arguments (map[strting]string) - could be passed to Process() using .WithArgument(name,value) calls
 
-## Functions defined by project
+## Template functions defined by project in addition to sprig
 
     joinPath - Joins any number of arguments into a path. The same as Go's filepath.Join.
     freeLocalPort - takes no arguments, returns free unique local port to be used for testing. For running tests in parallel implementation keeps global port map.
 
+
+## Example of using in your code, just to give you an idea
+
+    import (
+        _ "embed"
+        "github.com/rupor-github/gencfg"
+    )
+
+    // Embedded configuration template - provides smart defaults
+    //go:embed config.yaml.tmpl
+    var ConfigTmpl []byte
+
+    // Configuration structures
+    type (
+        Config struct {
+            SourcePath   string `yaml:"source" sanitize:"path_abs,path_toslash" validate:"required,dir"`
+            TargetPath   string `yaml:"target" sanitize:"path_clean,path_toslash" validate:"required,filepath|email"`
+        }
+    )
+
+    func unmarshalConfig(data []byte, cfg *Config, process bool) (*Config, error) {
+        // We want to use only fields we defined so we cannot use yaml.Unmarshal directly here
+        dec := yaml.NewDecoder(bytes.NewReader(data))
+        dec.KnownFields(true)
+        if err := dec.Decode(cfg); err != nil {
+            return nil, fmt.Errorf("failed to decode configuration data: %w", err)
+        }
+        if process {
+            // sanitize and validate what has been loaded
+            if err := gencfg.Sanitize(cfg); err != nil {
+                return nil, err
+            }
+            if err := gencfg.Validate(cfg, gencfg.WithAdditionalChecks(checks)); err != nil {
+                return nil, err
+            }
+        }
+        return cfg, nil
+    }
+
+    // LoadConfiguration reads the configuration from the file at the given path, superimposes its values on
+    // top of expanded configuration tamplate to provide sane defaults and performs validation.
+    func LoadConfiguration(path string, options ...func(*gencfg.ProcessingOptions)) (*Config, error) {
+        haveFile := len(path) > 0
+
+        data, err := gencfg.Process(ConfigTmpl, options...)
+        if err != nil {
+            return nil, fmt.Errorf("failed to process configuration template: %w", err)
+        }
+        cfg, err := unmarshalConfig(data, &Config{}, !haveFile)
+        if err != nil {
+            return nil, fmt.Errorf("failed to process configuration template: %w", err)
+        }
+        if !haveFile {
+            return cfg, nil
+        }
+
+        // overwrite cfg values with values from the file
+        data, err = os.ReadFile(path)
+        if err != nil {
+            return nil, fmt.Errorf("failed to read config file: %w", err)
+        }
+        cfg, err = unmarshalConfig(data, cfg, haveFile)
+        if err != nil {
+            return nil, fmt.Errorf("failed to process configuration file: %w", err)
+        }
+        return cfg, nil
+    }
+
+ProcessingOptions allows specifying root directory for expanding relative paths
+in configuration uniformly (.WithRootDir), passing additional arguments to
+templates (.WithArgument) and marking some fields not to be expanded as
+templates (.WithDoNotExpandField). You could also add some custom validation
+code if necessary (see below).
+
 ## Command line tool
+
+Sometimes you may want to get actual configuration file for your project. Use
+CLI tool from this project (could be part of your build). It's also good
+example of how to use imported gencfg in your code.
 
     ❯ gencfg -h
 
@@ -53,9 +131,9 @@ from single template.
        --help, -h                     show help (default: false)
        --version, -v                  print the version (default: false)
 
-## Some examples
+## Some examples of template expansion in configuration
 
-Reading database user/password from environment and if not set from Vault:
+Reading database user/password from environment and using defaults otherwise:
 
     db:
         username: '{{ default "user" (env "DB_USERNAME") }}'
@@ -64,17 +142,9 @@ Reading database user/password from environment and if not set from Vault:
 Setting parameters for logging from environment:
 
     logging:
-        level: info
-        # do not use "log timestamps" when running inside docker, rely on journald and docker logs to maintain timestamps
-        use_timestamp: "{{ not .Containerized }}"
-
-## Additional functionality provided by `gencfg` importable module
-
-Since application configuration structures defined in Go by creating struct
-types with declarative tags it makes sense to build on that as much as
-possible. Presently this module offers two additional declarative capabilities:
-"Sanitize" and "Validate" which used similarly to how YAML serde tags assigned to
-configuration struct fields.
+            level: info
+            # do not use "log timestamps" when running inside docker, rely on journald and docker logs to maintain timestamps
+            use_timestamp: "{{ not .Containerized }}"
 
 ## Sanitizing configuration values
 

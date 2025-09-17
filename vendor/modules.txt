@@ -11,12 +11,15 @@ github.com/disintegration/imaging
 # github.com/dustin/go-humanize v1.0.1
 ## explicit; go 1.16
 github.com/dustin/go-humanize
-# github.com/gabriel-vasile/mimetype v1.4.9
-## explicit; go 1.23.0
+# github.com/gabriel-vasile/mimetype v1.4.10
+## explicit; go 1.21
 github.com/gabriel-vasile/mimetype
 github.com/gabriel-vasile/mimetype/internal/charset
+github.com/gabriel-vasile/mimetype/internal/csv
 github.com/gabriel-vasile/mimetype/internal/json
 github.com/gabriel-vasile/mimetype/internal/magic
+github.com/gabriel-vasile/mimetype/internal/markup
+github.com/gabriel-vasile/mimetype/internal/scan
 # github.com/go-ole/go-ole v1.3.0
 ## explicit; go 1.12
 github.com/go-ole/go-ole
@@ -55,10 +58,12 @@ github.com/ncruces/go-strftime
 # github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec
 ## explicit; go 1.12
 github.com/remyoudompheng/bigfft
-# github.com/rupor-github/gencfg v1.0.6
-## explicit; go 1.24.1
+# github.com/rupor-github/gencfg v1.0.7
+## explicit; go 1.24.5
 github.com/rupor-github/gencfg
-# github.com/urfave/cli/v3 v3.3.8
+# github.com/stretchr/testify v1.11.1
+## explicit; go 1.17
+# github.com/urfave/cli/v3 v3.4.1
 ## explicit; go 1.22
 github.com/urfave/cli/v3
 # go.uber.org/multierr v1.11.0
@@ -77,49 +82,45 @@ go.uber.org/zap/internal/stacktrace
 go.uber.org/zap/internal/ztest
 go.uber.org/zap/zapcore
 go.uber.org/zap/zaptest
-# golang.org/x/crypto v0.40.0
-## explicit; go 1.23.0
+# golang.org/x/crypto v0.42.0
+## explicit; go 1.24.0
 golang.org/x/crypto/sha3
-# golang.org/x/exp v0.0.0-20250718183923-645b1fa84792
-## explicit; go 1.23.0
+# golang.org/x/exp v0.0.0-20250911091902-df9299821621
+## explicit; go 1.24.0
 golang.org/x/exp/constraints
-# golang.org/x/exp/typeparams v0.0.0-20250718183923-645b1fa84792
-## explicit; go 1.23.0
+# golang.org/x/exp/typeparams v0.0.0-20250911091902-df9299821621
+## explicit; go 1.24.0
 golang.org/x/exp/typeparams
-# golang.org/x/image v0.29.0
-## explicit; go 1.23.0
+# golang.org/x/image v0.31.0
+## explicit; go 1.24.0
 golang.org/x/image/bmp
 golang.org/x/image/ccitt
 golang.org/x/image/tiff
 golang.org/x/image/tiff/lzw
-# golang.org/x/mod v0.26.0
-## explicit; go 1.23.0
+# golang.org/x/mod v0.28.0
+## explicit; go 1.24.0
 golang.org/x/mod/semver
-# golang.org/x/net v0.42.0
-## explicit; go 1.23.0
-golang.org/x/net/html
-golang.org/x/net/html/atom
-# golang.org/x/sync v0.16.0
-## explicit; go 1.23.0
+# golang.org/x/sync v0.17.0
+## explicit; go 1.24.0
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.34.0
-## explicit; go 1.23.0
+# golang.org/x/sys v0.36.0
+## explicit; go 1.24.0
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.33.0
-## explicit; go 1.23.0
+# golang.org/x/term v0.35.0
+## explicit; go 1.24.0
 golang.org/x/term
-# golang.org/x/text v0.27.0
-## explicit; go 1.23.0
+# golang.org/x/text v0.29.0
+## explicit; go 1.24.0
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
 golang.org/x/text/language
-# golang.org/x/tools v0.35.0
-## explicit; go 1.23.0
+# golang.org/x/tools v0.37.0
+## explicit; go 1.24.0
 golang.org/x/tools/go/analysis
 golang.org/x/tools/go/analysis/passes/inspect
 golang.org/x/tools/go/ast/astutil
@@ -357,9 +358,11 @@ honnef.co/go/tools/stylecheck/st1021
 honnef.co/go/tools/stylecheck/st1022
 honnef.co/go/tools/stylecheck/st1023
 honnef.co/go/tools/unused
-# modernc.org/fileutil v1.3.10
+# modernc.org/cc/v4 v4.26.5
 ## explicit; go 1.21
-# modernc.org/libc v1.66.6
+# modernc.org/fileutil v1.3.33
+## explicit; go 1.21
+# modernc.org/libc v1.66.9
 ## explicit; go 1.23.0
 modernc.org/libc
 modernc.org/libc/errno
@@ -393,7 +396,7 @@ modernc.org/mathutil
 # modernc.org/memory v1.11.0
 ## explicit; go 1.23.0
 modernc.org/memory
-# modernc.org/sqlite v1.38.2
+# modernc.org/sqlite v1.39.0
 ## explicit; go 1.23.0
 modernc.org/sqlite/lib
 # zombiezen.com/go/sqlite v1.4.2

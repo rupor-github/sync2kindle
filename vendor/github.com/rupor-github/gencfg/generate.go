@@ -10,8 +10,9 @@ import (
 
 // ProcessingOptions holds options for expanding configuration files.
 type ProcessingOptions struct {
-	rootDir string
-	args    map[string]string
+	rootDir     string
+	args        map[string]string
+	doNotExpand map[string]bool
 }
 
 // WithRootDir sets root directory for template expansion.
@@ -29,6 +30,16 @@ func WithArgument(name, value string) func(*ProcessingOptions) {
 			opts.args = make(map[string]string)
 		}
 		opts.args[name] = value
+	}
+}
+
+// WithDoNotExpandField marks a field as not to be processed for template expansion.
+func WithDoNotExpandField(name string) func(*ProcessingOptions) {
+	return func(opts *ProcessingOptions) {
+		if opts.args == nil {
+			opts.args = make(map[string]string)
+		}
+		opts.doNotExpand[name] = true
 	}
 }
 
@@ -62,7 +73,9 @@ func (gctx *generationContext) walk(current, parent *yaml.Node, pos int) error {
 			return nil
 		}
 		// second node in the mapping - actual value, see if we could expand it
-		if current.Tag == "!!str" && gctx.couldBeTemplate(current.Value) {
+		if current.Tag == "!!str" && gctx.couldBeTemplate(current.Value) &&
+			(gctx.opts.doNotExpand == nil || !gctx.opts.doNotExpand[gctx.name]) {
+
 			value, err := expandField(gctx.name, current.Value, gctx.opts)
 			if err != nil {
 				return err
