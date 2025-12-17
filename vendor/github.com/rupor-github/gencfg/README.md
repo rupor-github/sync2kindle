@@ -178,6 +178,9 @@ Presently defined actions:
     path_abs - same as calling filepath.Abs(value) on the configuration field
     assure_dir_exists - will call os.MkdirAll(value), not changing field itself
     assure_dir_exists_for_file - will call os.MkdirAll(filepath.Dir(value)), not changing field itself
+    assure_file_access - will do filepath.Abs and os.stat on the result
+    oneof_or_tag - checks if value is in whitespace-separated list of allowed values; if not, applies the last token as a sanitize tag
+                   Example: sanitize:"oneof_or_tag=opt1 opt2 opt3 path_clean" - if value is opt1, opt2, or opt3, leave as-is; otherwise apply path_clean
 
 ## Validating configuration values
 

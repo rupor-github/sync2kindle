@@ -36,8 +36,8 @@ func WithArgument(name, value string) func(*ProcessingOptions) {
 // WithDoNotExpandField marks a field as not to be processed for template expansion.
 func WithDoNotExpandField(name string) func(*ProcessingOptions) {
 	return func(opts *ProcessingOptions) {
-		if opts.args == nil {
-			opts.args = make(map[string]string)
+		if opts.doNotExpand == nil {
+			opts.doNotExpand = make(map[string]bool)
 		}
 		opts.doNotExpand[name] = true
 	}

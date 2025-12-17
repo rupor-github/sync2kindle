@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -135,7 +136,7 @@ func sanitizeMap(field reflect.Value, name, parentTags string) error {
 
 func sanitizeValue(elem reflect.Value, name, tags string) error {
 	kind := elem.Kind()
-	for _, tag := range strings.Split(tags, ",") {
+	for tag := range strings.SplitSeq(tags, ",") {
 		if tag == "" {
 			continue
 		}
@@ -194,6 +195,43 @@ func sanitizeValue(elem reflect.Value, name, tags string) error {
 			if err := os.MkdirAll(dir, 0777); err != nil {
 				return fmt.Errorf("failed to create directory '%s': %w", dir, err)
 			}
+		case "assure_file_access":
+			if kind != reflect.String {
+				return fmt.Errorf("sanitize tag '%s' on '%s' only works on strings", tagKeyValue[0], name)
+			}
+			if len(elem.String()) == 0 {
+				return nil
+			}
+			fileName, err := filepath.Abs(elem.String())
+			if err != nil {
+				return fmt.Errorf("wrong file name '%s': %w", elem.String(), err)
+			}
+			if _, err := os.Stat(fileName); err != nil {
+				return fmt.Errorf("file '%s' does not exists or is not accessible: %w", fileName, err)
+			}
+		case "oneof_or_tag":
+			if kind != reflect.String {
+				return fmt.Errorf("sanitize tag '%s' on '%s' only works on strings", tagKeyValue[0], name)
+			}
+			if len(elem.String()) == 0 {
+				return nil
+			}
+			parts := strings.Split(tagKeyValue[1], " ")
+			if len(parts) == 0 {
+				return nil
+			}
+			if len(parts) == 1 {
+				return fmt.Errorf("sanitize tag '%s' on '%s' must contain list of one_of tokens and another tag: %s", tagKeyValue[0], name, tagKeyValue[1])
+			}
+
+			tokens, op := parts[:len(parts)-1], parts[len(parts)-1]
+			// check if value is in one_of tokens
+			if slices.Contains(tokens, elem.String()) {
+				return nil
+			}
+			// not found, apply operation
+			return sanitizeValue(elem, name, op)
+
 		// TODO: add more sanitize tags here when needed
 
 		case "test_call":

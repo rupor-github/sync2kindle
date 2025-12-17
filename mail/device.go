@@ -98,6 +98,21 @@ func (d *Device) Copy(obj *objects.ObjectInfo) (err error) {
 
 	ext := filepath.Ext(obj.ObjectName)
 	fullname := strings.TrimSuffix(filepath.Base(obj.ObjectName), ext)
+
+	// For EPUB files, try to extract the title from metadata
+	if strings.EqualFold(ext, ".epub") {
+		if title, err := common.GetEPUBTitle(obj.ObjectName); err == nil && title != "" {
+			fullname = title
+			d.log.Debug("Using EPUB title metadata",
+				zap.String("filename", filepath.Base(obj.ObjectName)),
+				zap.String("title", title))
+		} else {
+			d.log.Debug("Failed to extract EPUB title, using filename",
+				zap.String("filename", fullname),
+				zap.Error(err))
+		}
+	}
+
 	safename := slug.Make(fullname)
 
 	m := gomail.NewMessage(gomail.SetCharset("UTF-8"), gomail.SetEncoding(gomail.Base64))

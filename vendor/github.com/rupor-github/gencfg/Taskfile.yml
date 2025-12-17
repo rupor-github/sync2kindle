@@ -11,9 +11,9 @@ vars:
   # package is imported into other project and tool is build there, but we still need
   # to show proper version - let's deduce tag for next version automatically here,
   # otherwise it is easy to forget and we are always out of sync...
-  PRJ_VERSION: {sh: GOTOOLCHAIN=local+path go tool autotag -C -n}
+  PRJ_VERSION: {sh: GOTOOLCHAIN=local+path go tool autotag -C -n -b main}
 
-  GO_VERSION_MIN_REQUIRED: '1.24.5'
+  GO_VERSION_MIN_REQUIRED: '1.25.3'
 
   GO_VERSION_FULL: {sh: GOTOOLCHAIN=local+path go version}
   GO_VERSION: '{{regexFind "[0-9]+\\.[0-9]+\\.?[0-9]*" (regexFind "go version go[0-9]+\\.[0-9]+\\.?[0-9]*[a-zA-Z0-9]* [^/]+/.*" .GO_VERSION_FULL)}}'
