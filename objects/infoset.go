@@ -42,38 +42,38 @@ func New() ObjectInfoSet {
 	return make(ObjectInfoSet)
 }
 
-func (os ObjectInfoSet) Clone() ObjectInfoSet {
-	return maps.Clone(os)
+func (s ObjectInfoSet) Clone() ObjectInfoSet {
+	return maps.Clone(s)
 }
 
-func (os ObjectInfoSet) Find(fullPath string) *ObjectInfo {
+func (s ObjectInfoSet) Find(fullPath string) *ObjectInfo {
 	if len(fullPath) == 0 {
 		return nil
 	}
 	fullPath = filepath.ToSlash(fullPath)
-	if info, exists := os[fullPath]; exists {
+	if info, exists := s[fullPath]; exists {
 		return info
 	}
 	return nil
 }
 
-func (os ObjectInfoSet) Add(fullPath string, fi *ObjectInfo) {
+func (s ObjectInfoSet) Add(fullPath string, fi *ObjectInfo) {
 	if len(fullPath) != 0 {
 		fullPath = filepath.ToSlash(fullPath)
-		os[fullPath] = fi
+		s[fullPath] = fi
 	}
 }
 
-func (os ObjectInfoSet) Delete(fullPath string) {
+func (s ObjectInfoSet) Delete(fullPath string) {
 	if len(fullPath) != 0 {
 		fullPath = filepath.ToSlash(fullPath)
-		delete(os, fullPath)
+		delete(s, fullPath)
 	}
 }
 
-func (os ObjectInfoSet) SubsetByFunc(f func(key string, fi *ObjectInfo) bool) ObjectInfoSet {
+func (s ObjectInfoSet) SubsetByFunc(f func(key string, fi *ObjectInfo) bool) ObjectInfoSet {
 	nos := make(ObjectInfoSet)
-	for k, v := range os {
+	for k, v := range s {
 		if f(k, v) {
 			nos[k] = v
 		}
@@ -81,13 +81,13 @@ func (os ObjectInfoSet) SubsetByFunc(f func(key string, fi *ObjectInfo) bool) Ob
 	return nos
 }
 
-func (os ObjectInfoSet) SubsetByPath(dir string) ObjectInfoSet {
+func (s ObjectInfoSet) SubsetByPath(dir string) ObjectInfoSet {
 	if len(dir) == 0 {
-		return os
+		return s
 	}
 	dir = filepath.ToSlash(dir)
 	nos := make(ObjectInfoSet)
-	for k, v := range os {
+	for k, v := range s {
 		base := k
 		if !v.Dir {
 			base = path.Dir(k)
@@ -105,26 +105,26 @@ func (os ObjectInfoSet) SubsetByPath(dir string) ObjectInfoSet {
 }
 
 // DiffByFunc returns a new ObjectInfoSet that contains only the elements that are present
-// in os and in other set, but are different (equal returns false).
-// NOTE: same key in both sets could point to different values, values from os are returned in new set.
-func (os ObjectInfoSet) DiffByFunc(other ObjectInfoSet, equal func(a, b *ObjectInfo) bool) ObjectInfoSet {
+// in s and in other set, but are different (equal returns false).
+// NOTE: same key in both sets could point to different values, values from s are returned in new set.
+func (s ObjectInfoSet) DiffByFunc(other ObjectInfoSet, equal func(a, b *ObjectInfo) bool) ObjectInfoSet {
 	nos := make(ObjectInfoSet)
-	for k := range os {
+	for k := range s {
 		if _, exists := other[k]; exists {
-			if !equal(os[k], other[k]) {
-				nos[k] = os[k]
+			if !equal(s[k], other[k]) {
+				nos[k] = s[k]
 			}
 		}
 	}
 	return nos
 }
 
-// Subtract returns a new ObjectInfoSet that contains only the elements that are present in os but not in other.
-// This is a set difference operation on keys: (os - other).
-// NOTE: same key in both sets could point to different values, values from os are returned in new set.
-func (os ObjectInfoSet) Subtract(other ObjectInfoSet) ObjectInfoSet {
+// Subtract returns a new ObjectInfoSet that contains only the elements that are present in s but not in other.
+// This is a set difference operation on keys: (s - other).
+// NOTE: same key in both sets could point to different values, values from s are returned in new set.
+func (s ObjectInfoSet) Subtract(other ObjectInfoSet) ObjectInfoSet {
 	nos := make(ObjectInfoSet)
-	for k, v := range os {
+	for k, v := range s {
 		if _, exists := other[k]; !exists {
 			nos[k] = v
 		}
@@ -132,23 +132,23 @@ func (os ObjectInfoSet) Subtract(other ObjectInfoSet) ObjectInfoSet {
 	return nos
 }
 
-// Intersect returns a new ObjectInfoSet that contains only the elements that are present in both os and other.
-// This is a set intersection operation on keys: (os ∩ other).
-// NOTE: same key in both sets could point to different values, values from os are returned in new set.
-func (os ObjectInfoSet) Intersect(other ObjectInfoSet) ObjectInfoSet {
+// Intersect returns a new ObjectInfoSet that contains only the elements that are present in both s and other.
+// This is a set intersection operation on keys: (s ∩ other).
+// NOTE: same key in both sets could point to different values, values from s are returned in new set.
+func (s ObjectInfoSet) Intersect(other ObjectInfoSet) ObjectInfoSet {
 	nos := make(ObjectInfoSet)
-	for k := range os {
+	for k := range s {
 		if _, exists := other[k]; exists {
-			nos[k] = os[k]
+			nos[k] = s[k]
 		}
 	}
 	return nos
 }
 
-// Union returns a new ObjectInfoSet that contains all the elements that are present in either os or other.
-func (os ObjectInfoSet) Union(other ObjectInfoSet) ObjectInfoSet {
+// Union returns a new ObjectInfoSet that contains all the elements that are present in either s or other.
+func (s ObjectInfoSet) Union(other ObjectInfoSet) ObjectInfoSet {
 	nos := make(ObjectInfoSet)
-	for k, v := range os {
+	for k, v := range s {
 		nos[k] = v
 	}
 	for k, v := range other {

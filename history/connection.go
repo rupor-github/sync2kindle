@@ -2,10 +2,10 @@ package history
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
-	ole "github.com/go-ole/go-ole"
 	"go.uber.org/zap"
 	"zombiezen.com/go/sqlite"
 	"zombiezen.com/go/sqlite/sqlitex"
@@ -61,15 +61,15 @@ func (c *Connection) UniqueID() string {
 }
 
 func (c *Connection) MkDir(obj *objects.ObjectInfo) error {
-	return ole.NewError(ole.E_NOTIMPL)
+	return errors.ErrUnsupported
 }
 
 func (c *Connection) Remove(obj *objects.ObjectInfo) error {
-	return ole.NewError(ole.E_NOTIMPL)
+	return errors.ErrUnsupported
 }
 
 func (c *Connection) Copy(obj *objects.ObjectInfo) error {
-	return ole.NewError(ole.E_NOTIMPL)
+	return errors.ErrUnsupported
 }
 
 func (c *Connection) GetObjectInfos() (ois objects.ObjectInfoSet, err error) {

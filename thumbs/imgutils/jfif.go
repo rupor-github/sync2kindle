@@ -14,7 +14,7 @@ type JpegDPIType uint8
 const (
 	DpiNoUnits JpegDPIType = iota
 	DpiPxPerInch
-	DpiPxPerSm
+	DpiPxPerCm
 )
 
 var (
@@ -26,6 +26,11 @@ var (
 func SetJpegDPI(buf *bytes.Buffer, dpit JpegDPIType, xdensity, ydensity int16) (*bytes.Buffer, bool) {
 
 	data := buf.Bytes()
+
+	// Need at least SOI (2 bytes) + marker (2 bytes) to check
+	if len(data) < 4 {
+		return buf, false
+	}
 
 	// If JFIF APP0 segment is there - do not do anything
 	if bytes.Equal(data[2:4], marker) {

@@ -81,7 +81,7 @@ tasks:
       You can specify what packages to benchmark by using PACKAGES environment variable, for example: "PACKAGES='./module1,./module2' task bench".
       You can pass any additional parameters supported by "go test", for example: "PACKAGES='./module1' task bench -- -bench=BenchmarkFuncPattern -benchmem".
     platforms: [linux]
-    deps: [generate-project-version, get-dictionaries, get-sentences, generate-enums]
+    deps: [generate-project-version]
     vars:
       TEST_DIR: "{{.ROOT_DIR}}/{{.DEV_BUILD_DIR}}/tests_results"
       DIRS_WITH_TESTS:
@@ -98,13 +98,13 @@ tasks:
 
   escape:
     desc: |
-      Runs escape analisys on specified package.
+      Runs escape analysis on specified package.
       You could specify anything in the project, for example "task escape -- ./module1".
       If no package is specified assumes "./cmd/{{.PRJ_NAME}}".
     platforms: [linux]
     deps: [generate-project-version]
     cmds:
-      - echo "{{.TATN}}Building binary with escape analisys enabled{{.TOFF}}"
+      - echo "{{.TATN}}Building binary with escape analysis enabled{{.TOFF}}"
       - go build -mod=mod -gcflags 'all=-m' -o /dev/null {{default (joinPath "./cmd/" .PRJ_NAME) .CLI_ARGS}}
     method: none
 

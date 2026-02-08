@@ -32,5 +32,5 @@ func (id PnPDeviceID) Serial() string {
 }
 
 func (id PnPDeviceID) String() string {
-	return fmt.Sprintf("USB&VIDc%04X&PID_%04X#%s#%02d.%d%d", id.vid, id.pid, id.serial, id.bcd>>8, id.bcd&0xF0, id.bcd&0x0F)
+	return fmt.Sprintf("USB&VID_%04X&PID_%04X#%s#%02d.%d%d", id.vid, id.pid, id.serial, id.bcd>>8, id.bcd&0xF0, id.bcd&0x0F)
 }

@@ -7,7 +7,7 @@ import (
 )
 
 func TestSubsetByPath(t *testing.T) {
-	os := ObjectInfoSet{
+	s := ObjectInfoSet{
 		"D:/test/01.azw3":    &ObjectInfo{FullPath: "D:/test/01.azw3", File: true},
 		"D:/test/02.azw3":    &ObjectInfo{FullPath: "D:/test/02.azw3", File: true},
 		"D:/test/01":         &ObjectInfo{FullPath: "D:/test/01", Dir: true},
@@ -17,20 +17,20 @@ func TestSubsetByPath(t *testing.T) {
 		"D:/test/02/01.azw3": &ObjectInfo{FullPath: "D:/test/02/01.azw3", File: true},
 		"D:/test/02/02.azw3": &ObjectInfo{FullPath: "D:/test/02/02.azw3", File: true},
 	}
-	// keys := make([]string, 0, len(os))
-	// for k := range os {
+	// keys := make([]string, 0, len(s))
+	// for k := range s {
 	// 	keys = append(keys, k)
 	// }
 	// slices.Sort(keys)
 	// for _, k := range keys {
-	// 	t.Logf("SET - %s: %s", k, os[k])
+	// 	t.Logf("SET - %s: %s", k, s[k])
 	// }
-	if len(os) != 8 {
-		t.Fatal("Set Size not 8:", len(os))
+	if len(s) != 8 {
+		t.Fatal("Set Size not 8:", len(s))
 	}
-	t.Log("Set Size:", len(os))
+	t.Log("Set Size:", len(s))
 
-	subset := os.SubsetByPath("D:/test")
+	subset := s.SubsetByPath("D:/test")
 
 	// keys = make([]string, 0, len(subset))
 	// for k := range subset {
@@ -62,7 +62,7 @@ func TestSubsetByPath(t *testing.T) {
 	}
 	t.Log("SUBSET Size:", len(subset))
 
-	subset = os.SubsetByPath("D:/test/01")
+	subset = s.SubsetByPath("D:/test/01")
 
 	// keys = make([]string, 0, len(subset))
 	// for k := range subset {

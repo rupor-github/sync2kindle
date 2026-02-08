@@ -2,6 +2,7 @@
 package state
 
 import (
+	"errors"
 	"time"
 
 	"go.uber.org/zap"
@@ -31,7 +32,7 @@ const (
 
 // Set implements cli's flag interface
 func (e *LocalEnv) Set(value string) error {
-	panic("localenv value should never be set directly")
+	return errors.New("localenv value should never be set directly")
 }
 
 // String implements cli's flag interface

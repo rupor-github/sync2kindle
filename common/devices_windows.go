@@ -9,12 +9,18 @@ import (
 // NOTE: we keep zero terminator in the slice to avoid additional UTF16 to UTF16Ptr conversion
 type PnPDeviceID []uint16
 
+var (
+	reVendorID  = regexp.MustCompile(`(?i)USB[#&]VID_([0-9A-F]+)&PID_[0-9A-F]+`)
+	reProductID = regexp.MustCompile(`(?i)USB[#&]VID_[0-9A-F]+&PID_([0-9A-F]+)`)
+	reSerial    = regexp.MustCompile(`(?i)USB[#&]VID_[0-9A-F]+&PID_[0-9A-F]+#(.+)#.+`)
+)
+
 // VendorID returns Vendor ID or zero if it cannot parse PnP device ID string.
 // NOTE: this is not what Microsoft recommends doing, descriptor is supposed to be opaque,
 // but it is working on all Windows versions so far and alternative is bulky at best.
 // https://learn.microsoft.com/en-us/windows-hardware/drivers/install/standard-usb-identifiers
 func (p PnPDeviceID) VendorID() int {
-	matches := regexp.MustCompile(`(?i)USB[#&]VID_([0-9A-F]+)&PID_[0-9A-F]+`).FindStringSubmatch(p.String())
+	matches := reVendorID.FindStringSubmatch(p.String())
 	if len(matches) != 2 {
 		return 0
 	}
@@ -33,7 +39,7 @@ func (p PnPDeviceID) VendorID() int {
 // but it is working on all Windows versions so far and alternative is bulky at best.
 // https://learn.microsoft.com/en-us/windows-hardware/drivers/install/standard-usb-identifiers
 func (p PnPDeviceID) ProductID() int {
-	matches := regexp.MustCompile(`(?i)USB[#&]VID_[0-9A-F]+&PID_([0-9A-F]+)`).FindStringSubmatch(p.String())
+	matches := reProductID.FindStringSubmatch(p.String())
 	if len(matches) != 2 {
 		return 0
 	}
@@ -51,7 +57,7 @@ func (p PnPDeviceID) ProductID() int {
 // NOTE: this is not what Microsoft recommends doing, descriptor is supposed to be opaque,
 // but it is working on all Windows versions so far and alternative is bulky at best.
 func (p PnPDeviceID) Serial() string {
-	matches := regexp.MustCompile(`(?i)USB[#&]VID_[0-9A-F]+&PID_[0-9A-F]+#(.+)#.+`).FindStringSubmatch(p.String())
+	matches := reSerial.FindStringSubmatch(p.String())
 	if len(matches) != 2 {
 		return ""
 	}

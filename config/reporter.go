@@ -197,7 +197,6 @@ func copyFile(dir, src string, modTime time.Time) (string, error) {
 	if err = out.Sync(); err != nil {
 		return "", err
 	}
-	out.Close()
 
 	if err := os.Chtimes(dst, modTime, modTime); err != nil {
 		return "", err

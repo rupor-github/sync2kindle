@@ -36,7 +36,7 @@ func GetEPUBTitle(epubPath string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			data, err := io.ReadAll(rc)
+			data, err := io.ReadAll(io.LimitReader(rc, 1<<20)) // 1 MiB limit for container.xml
 			rc.Close()
 			if err != nil {
 				return "", err
@@ -64,7 +64,7 @@ func GetEPUBTitle(epubPath string) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			data, err := io.ReadAll(rc)
+			data, err := io.ReadAll(io.LimitReader(rc, 10<<20)) // 10 MiB limit for content.opf
 			rc.Close()
 			if err != nil {
 				return "", err
