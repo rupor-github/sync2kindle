@@ -9,7 +9,7 @@ type SecretString string
 // MarshalJSON marshals SecretString to JSON making sure that actual value is not visible.
 func (s SecretString) MarshalJSON() ([]byte, error) {
 	if len(s) == 0 {
-		return nil, nil
+		return []byte(`""`), nil
 	}
 	return []byte("\"" + SecretStringValue + "\""), nil
 }

@@ -71,6 +71,9 @@ func pickDevice(serial string, log *zap.Logger) (*common.PnPDeviceID, string, er
 		mount  string
 	)
 	if err := filepath.Walk("/sys/devices", func(usbPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if !info.Mode().IsRegular() {
 			return nil
 		}
@@ -161,6 +164,9 @@ func pickDevice(serial string, log *zap.Logger) (*common.PnPDeviceID, string, er
 func getVolumeDetails(root string) (*deviceDetails, error) {
 	var dd deviceDetails
 	if err := filepath.Walk(root, func(usbPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if !strings.Contains(usbPath, "/block/") {
 			return nil
 		}

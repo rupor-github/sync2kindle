@@ -22,7 +22,7 @@ func (conf *ReporterConfig) Prepare() (*Report, error) {
 
 	if f, err := os.Create(conf.Destination); err == nil {
 		r.file = f
-	} else if f, err = os.CreateTemp("", "sync2kingle-report.*.zip"); err == nil {
+	} else if f, err = os.CreateTemp("", "sync2kindle-report.*.zip"); err == nil {
 		r.file = f
 	} else {
 		return nil, fmt.Errorf("unable to create report: %w", err)
@@ -41,8 +41,9 @@ type entry struct {
 // NOTE: presently not to be used concurrently!
 type Report struct {
 	// entries is a map of names to entries of files or directories to be put in the final archive later.
-	entries map[string]entry
-	file    *os.File
+	entries  map[string]entry
+	file     *os.File
+	tempDirs []string // temp dirs created by StoreCopy, cleaned up in Close()
 }
 
 // Close finalizes debug report.
@@ -54,7 +55,12 @@ func (r *Report) Close() error {
 	if r.file == nil {
 		return nil
 	}
-	defer r.file.Close()
+	defer func() {
+		r.file.Close()
+		for _, dir := range r.tempDirs {
+			os.RemoveAll(dir)
+		}
+	}()
 	return r.finalize()
 }
 
@@ -141,6 +147,7 @@ func (r *Report) StoreCopy(name, path string) error {
 	if err != nil {
 		return err
 	}
+	r.tempDirs = append(r.tempDirs, dir)
 
 	if info, err := os.Stat(e.actual); err == nil {
 		switch {

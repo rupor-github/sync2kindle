@@ -139,17 +139,21 @@ func (r *Reader) extractThumbnail(data []byte) error {
 	if index := slices.IndexFunc(bmd.CategorizedMetadata, func(p properties) bool {
 		if p.Category == "kindle_title_metadata" {
 			for _, prop := range p.Metadata {
+				s, ok := prop.Value.(string)
+				if !ok {
+					continue
+				}
 				switch prop.Key {
 				case "ASIN":
-					r.asin = prop.Value.(string)
+					r.asin = s
 				case "cde_content_type":
-					r.cdetype = prop.Value.(string)
+					r.cdetype = s
 				case "asset_id":
-					r.assetID = prop.Value.(string)
+					r.assetID = s
 				case "book_id":
-					r.bookID = prop.Value.(string)
+					r.bookID = s
 				case "cover_image":
-					coverResourceName = prop.Value.(string)
+					coverResourceName = s
 				}
 			}
 			return true

@@ -58,6 +58,9 @@ func readData(data []byte, v any) (int, error) {
 }
 
 func decodeIon(prolog, data []byte, v any) error {
+	if len(data) < len(ionBVM) {
+		return fmt.Errorf("ion data too short: got %d bytes, need at least %d", len(data), len(ionBVM))
+	}
 	if err := ion.Unmarshal(append(prolog, data[len(ionBVM):]...), v, sharedSymbolTable); err != nil {
 		return err
 	}

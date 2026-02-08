@@ -146,11 +146,11 @@ func (d *Device) Copy(obj *objects.ObjectInfo) (err error) {
 		if err := gomail.Send(sf, m); err != nil {
 			return err
 		}
-	}
-
-	// real send
-	if err := gomail.NewDialer(d.smtp.Server, d.smtp.Port, d.smtp.User, string(d.smtp.Password)).DialAndSend(m); err != nil {
-		return fmt.Errorf("unable to send e-mail: %w", err)
+	} else {
+		// real send
+		if err := gomail.NewDialer(d.smtp.Server, d.smtp.Port, d.smtp.User, string(d.smtp.Password)).DialAndSend(m); err != nil {
+			return fmt.Errorf("unable to send e-mail: %w", err)
+		}
 	}
 	return nil
 }

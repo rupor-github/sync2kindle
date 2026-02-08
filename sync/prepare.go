@@ -27,7 +27,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -289,12 +288,6 @@ func makeAction(actor driver, action string, obj *objects.ObjectInfo, log *zap.L
 		panic("making action with nil object")
 	}
 
-	v := reflect.ValueOf(actor)
-	method := v.MethodByName(action)
-	if !method.IsValid() {
-		panic("making action driver method not found")
-	}
-
 	subjectName := "file"
 	if obj.Dir {
 		subjectName = "directory"
@@ -303,6 +296,18 @@ func makeAction(actor driver, action string, obj *objects.ObjectInfo, log *zap.L
 	log.Debug("Making action",
 		zap.String("action", action), zap.String("actor", actor.Name()), zap.String("subject", subjectName), zap.String("object", obj.FullPath))
 
+	var method func(*objects.ObjectInfo) error
+	switch action {
+	case "MkDir":
+		method = actor.MkDir
+	case "Remove":
+		method = actor.Remove
+	case "Copy":
+		method = actor.Copy
+	default:
+		panic(fmt.Sprintf("making action: unknown driver method %q", action))
+	}
+
 	return func(dryRun bool, log *zap.Logger) error {
 		log.Named(actor.Name()).Info("Executing", zap.String("action", action), zap.String(subjectName, obj.FullPath))
 
@@ -310,11 +315,7 @@ func makeAction(actor driver, action string, obj *objects.ObjectInfo, log *zap.L
 			return nil
 		}
 
-		res := method.Call([]reflect.Value{reflect.ValueOf(obj)})
-		if len(res) > 0 && !res[0].IsNil() {
-			return res[0].Interface().(error)
-		}
-		return nil
+		return method(obj)
 	}
 }
 

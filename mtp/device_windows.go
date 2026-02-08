@@ -426,6 +426,9 @@ func getObjectInfo(
 		return o, fmt.Errorf("unable to get object parent id: %w", err)
 	}
 	o.OidParent, err = windows.UTF16FromString(parent)
+	if err != nil {
+		return o, fmt.Errorf("unable to convert parent id to UTF16: %w", err)
+	}
 	o.PersistentID, err = valuesCommon.GetStringValue(WPD_OBJECT_PERSISTENT_UNIQUE_ID)
 	if err != nil {
 		return o, fmt.Errorf("unable to get object persistent unique id: %w", err)

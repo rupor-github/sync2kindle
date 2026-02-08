@@ -79,6 +79,7 @@ func sync(ctx context.Context, cmd *cli.Command, protocol common.SupportedProtoc
 		if err != nil {
 			return fmt.Errorf("unable to create temporary directory: %w", err)
 		}
+		defer os.RemoveAll(thumbDir)
 		env.Cfg.Thumbnails.Dir = thumbDir
 		env.Rpt.Store("thumbs", thumbDir)
 		// indicate that thumbs need to be processed
@@ -143,9 +144,11 @@ func sync(ctx context.Context, cmd *cli.Command, protocol common.SupportedProtoc
 	// do the work
 
 	dryRun := cmd.Bool("dry-run")
+	var actionErrors []error
 	for _, action := range actions {
 		if err := action(dryRun, log); err != nil {
-			return fmt.Errorf("action failed: %w", err)
+			actionErrors = append(actionErrors, err)
+			log.Error("Action failed, continuing", zap.Error(err))
 		}
 	}
 
@@ -156,6 +159,9 @@ func sync(ctx context.Context, cmd *cli.Command, protocol common.SupportedProtoc
 			return fmt.Errorf("history objects cannot be saved: %w", err)
 		}
 		log.Debug("History next step", zap.Int64("stepID", hst.StepID()))
+	}
+	if len(actionErrors) > 0 {
+		return fmt.Errorf("action failed: %w", errors.Join(actionErrors...))
 	}
 	return nil
 }

@@ -438,6 +438,9 @@ func findSNForConnectedDevice(dir string, srcvid, srcpid, srcbus, srcdev int) (s
 	var result string
 
 	if err := filepath.Walk(dir, func(usbPath string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		if !info.Mode().IsRegular() {
 			return nil
 		}
