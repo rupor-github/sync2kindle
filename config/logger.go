@@ -10,6 +10,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/zapcore"
+
+	"s2k/misc"
 )
 
 type LoggerConfig struct {
@@ -120,8 +122,8 @@ func (conf *LoggingConfig) Prepare(rpt *Report) (*zap.Logger, error) {
 			ef  *os.File
 			err error
 		)
-		if ef, err = opener(filepath.Join(filepath.Dir(conf.FileLogger.Destination), "sync2kindle-panic.log"), modeRequested); err == nil {
-		} else if ef, err = os.CreateTemp("", "sync2kindle-panic.*.log"); err == nil {
+		if ef, err = opener(filepath.Join(filepath.Dir(conf.FileLogger.Destination), misc.GetAppName()+"-panic.log"), modeRequested); err == nil {
+		} else if ef, err = os.CreateTemp("", misc.GetAppName()+"-panic.*.log"); err == nil {
 		} else {
 			// just quietly ignore
 			ef = nil
@@ -135,7 +137,7 @@ func (conf *LoggingConfig) Prepare(rpt *Report) (*zap.Logger, error) {
 		if f, err := opener(conf.FileLogger.Destination, modeRequested); err == nil {
 			fileCore = zapcore.NewCore(fileEncoder, zapcore.Lock(f), logLevel)
 			rpt.Store("final.log", f.Name())
-		} else if f, err = os.CreateTemp("", "sync2kindle.*.log"); err == nil {
+		} else if f, err = os.CreateTemp("", misc.GetAppName()+".*.log"); err == nil {
 			newName = f.Name()
 			fileCore = zapcore.NewCore(fileEncoder, zapcore.Lock(f), logLevel)
 			rpt.Store("final.log", newName)

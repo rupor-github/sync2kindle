@@ -208,7 +208,7 @@ To see actual "active" configuration use dry-run mode.
 	// remove empty panic log if any
 	if env.Cfg != nil && len(env.Cfg.Logging.FileLogger.Destination) > 0 {
 		debug.SetCrashOutput(nil, debug.CrashOptions{})
-		fname := filepath.Join(filepath.Dir(env.Cfg.Logging.FileLogger.Destination), "sync2kindle-panic.log")
+		fname := filepath.Join(filepath.Dir(env.Cfg.Logging.FileLogger.Destination), misc.GetAppName()+"-panic.log")
 		if fi, err := os.Stat(fname); err == nil && fi.Size() == 0 {
 			os.Remove(fname)
 		}
