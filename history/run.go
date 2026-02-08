@@ -11,7 +11,7 @@ import (
 	"zombiezen.com/go/sqlite"
 	"zombiezen.com/go/sqlite/sqlitex"
 
-	"sync2kindle/state"
+	"s2k/state"
 )
 
 func RunList(ctx context.Context, cmd *cli.Command) error {

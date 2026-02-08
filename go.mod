@@ -1,4 +1,4 @@
-module sync2kindle
+module s2k
 
 go 1.25.5
 

@@ -14,9 +14,9 @@ import (
 	"go.uber.org/zap"
 	gomail "gopkg.in/gomail.v2"
 
-	"sync2kindle/common"
-	"sync2kindle/config"
-	"sync2kindle/objects"
+	"s2k/common"
+	"s2k/config"
+	"s2k/objects"
 )
 
 // should be usable in the zap log.Named()

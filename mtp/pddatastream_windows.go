@@ -6,8 +6,8 @@ import (
 
 	ole "github.com/go-ole/go-ole"
 
-	"sync2kindle/common"
-	"sync2kindle/objects"
+	"s2k/common"
+	"s2k/objects"
 )
 
 // implements io.Writer interface

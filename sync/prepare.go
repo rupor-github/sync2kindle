@@ -34,9 +34,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"sync2kindle/common"
-	"sync2kindle/config"
-	"sync2kindle/objects"
+	"s2k/common"
+	"s2k/config"
+	"s2k/objects"
 )
 
 type action func(bool, *zap.Logger) error

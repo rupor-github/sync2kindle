@@ -4,7 +4,7 @@ import (
 	humanize "github.com/dustin/go-humanize"
 	ole "github.com/go-ole/go-ole"
 
-	"sync2kindle/objects"
+	"s2k/objects"
 )
 
 // should be usable in the zap log.Named()

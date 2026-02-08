@@ -12,14 +12,14 @@ import (
 	cli "github.com/urfave/cli/v3"
 	"go.uber.org/zap"
 
-	"sync2kindle/common"
-	"sync2kindle/config"
-	"sync2kindle/files"
-	"sync2kindle/history"
-	"sync2kindle/mail"
-	"sync2kindle/mtp"
-	"sync2kindle/state"
-	"sync2kindle/usbms"
+	"s2k/common"
+	"s2k/config"
+	"s2k/files"
+	"s2k/history"
+	"s2k/mail"
+	"s2k/mtp"
+	"s2k/state"
+	"s2k/usbms"
 )
 
 func RunUSB(ctx context.Context, cmd *cli.Command) error {

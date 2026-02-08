@@ -18,9 +18,9 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sys/windows"
 
-	"sync2kindle/common"
-	"sync2kindle/misc"
-	"sync2kindle/objects"
+	"s2k/common"
+	"s2k/misc"
+	"s2k/objects"
 )
 
 type Device struct {

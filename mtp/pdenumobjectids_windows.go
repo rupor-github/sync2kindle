@@ -6,8 +6,8 @@ import (
 
 	ole "github.com/go-ole/go-ole"
 
-	"sync2kindle/common"
-	"sync2kindle/objects"
+	"s2k/common"
+	"s2k/objects"
 )
 
 func (v *IEnumPortableDeviceObjectIDs) Next(number uint32) ([]objects.ObjectID, error) {

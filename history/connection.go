@@ -10,7 +10,7 @@ import (
 	"zombiezen.com/go/sqlite"
 	"zombiezen.com/go/sqlite/sqlitex"
 
-	"sync2kindle/objects"
+	"s2k/objects"
 )
 
 // should be usable in the zap log.Named()

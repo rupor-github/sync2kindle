@@ -1,5 +1,2 @@
 vendor/
-static/
-pkg/
 go.sum
-README.*

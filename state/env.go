@@ -6,7 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"sync2kindle/config"
+	"s2k/config"
 )
 
 // LocalEnv keeps everything program needs in a single place.

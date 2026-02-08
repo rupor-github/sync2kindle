@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"unicode/utf16"
 
-	"sync2kindle/common"
+	"s2k/common"
 )
 
 // NOTE: we keep zero terminator in the slice to avoid additional UTF16 to UTF16Ptr conversion

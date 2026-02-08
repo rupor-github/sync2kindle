@@ -7,8 +7,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 
-	"sync2kindle/config"
-	"sync2kindle/objects"
+	"s2k/config"
+	"s2k/objects"
 )
 
 type testPrepareActionsCase struct {

@@ -12,8 +12,8 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 
-	"sync2kindle/common"
-	"sync2kindle/files"
+	"s2k/common"
+	"s2k/files"
 )
 
 type Device struct {

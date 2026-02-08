@@ -6,7 +6,7 @@ import (
 
 	ole "github.com/go-ole/go-ole"
 
-	"sync2kindle/objects"
+	"s2k/objects"
 )
 
 func (v *IPortableDeviceProperties) GetValues(oid objects.ObjectID, keys *IPortableDeviceKeyCollection) (ipdv *IPortableDeviceValues, err error) {

@@ -7,8 +7,8 @@ import (
 
 	ole "github.com/go-ole/go-ole"
 
-	"sync2kindle/common"
-	"sync2kindle/objects"
+	"s2k/common"
+	"s2k/objects"
 )
 
 func (v *IPortableDeviceContent) Properties() (ipdp *IPortableDeviceProperties, err error) {

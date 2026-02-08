@@ -6,7 +6,7 @@ import (
 
 	ole "github.com/go-ole/go-ole"
 
-	"sync2kindle/common"
+	"s2k/common"
 )
 
 func (v *IPortableDeviceManager) VTable() *IPortableDeviceManagerVtbl {

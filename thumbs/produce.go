@@ -6,9 +6,9 @@ import (
 
 	"go.uber.org/zap"
 
-	"sync2kindle/config"
-	"sync2kindle/thumbs/kfx"
-	"sync2kindle/thumbs/mobi"
+	"s2k/config"
+	"s2k/thumbs/kfx"
+	"s2k/thumbs/mobi"
 )
 
 func ExtractThumbnail(fname string, params *config.ThumbnailsConfig, log *zap.Logger) (name string) {

@@ -11,11 +11,20 @@
 *.zip
 *.syso
 *.conf
+*.epub
+*.fb2
+*.kfx
+*.txt
+*.pyc
+todo.md
 
 # build specific
 build/
 build_*/
 release/
 release_*/
+**/todo.md
+**/__pycache__/*
 misc/version.go
-
+!vendor/*.md
+!vendor/*.txt

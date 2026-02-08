@@ -12,11 +12,11 @@ import (
 	cli "github.com/urfave/cli/v3"
 	"go.uber.org/zap"
 
-	"sync2kindle/config"
-	"sync2kindle/history"
-	"sync2kindle/misc"
-	"sync2kindle/state"
-	"sync2kindle/sync"
+	"s2k/config"
+	"s2k/history"
+	"s2k/misc"
+	"s2k/state"
+	"s2k/sync"
 )
 
 func beforeAppRun(ctx context.Context, cmd *cli.Command) (context.Context, error) {

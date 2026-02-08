@@ -18,7 +18,7 @@ import (
 	"github.com/disintegration/imaging"
 	"go.uber.org/zap"
 
-	"sync2kindle/thumbs/imgutils"
+	"s2k/thumbs/imgutils"
 )
 
 type Reader struct {

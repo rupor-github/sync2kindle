@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"sync2kindle/common"
+	"s2k/common"
 )
 
 func GetName(protocol common.SupportedProtocols, ids ...string) string {
