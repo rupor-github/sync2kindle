@@ -116,7 +116,6 @@ func (d *Device) Disconnect() {
 		d.pdmanager = nil
 	}
 	ole.CoUninitialize()
-	return
 }
 
 func (d *Device) UniqueID() string {
@@ -567,7 +566,7 @@ func (d *Device) fillStorageInfo() (propSet, error) {
 		return nil, fmt.Errorf("failed to GetCount for functional categories: %w", err)
 	}
 	found := false
-	for i := uint32(0); i < count; i++ {
+	for i := range count {
 		v, err := categories.GetAt(i)
 		if err != nil {
 			return nil, fmt.Errorf("failed to GetAt(%d) for functional categories: %w", i, err)
