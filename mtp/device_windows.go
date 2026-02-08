@@ -861,10 +861,9 @@ func prepareClientInfo() (ci *IPortableDeviceValues, err error) {
 		if id, err := strconv.ParseInt(matches[2], 10, 32); err == nil {
 			minor = uint32(id)
 		}
-		if id, err := strconv.ParseInt(matches[2], 10, 32); err == nil {
+		if id, err := strconv.ParseInt(matches[3], 10, 32); err == nil {
 			revision = uint32(id)
 		}
-		return
 	}
 	err = ci.SetUnsignedIntegerValue(WPD_CLIENT_MAJOR_VERSION, major)
 	if err != nil {

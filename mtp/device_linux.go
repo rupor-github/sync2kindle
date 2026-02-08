@@ -262,8 +262,8 @@ func (d *Device) enumerateObjects(parent objects.ObjectID, root string, infos []
 
 		if prev != nil {
 			C.LIBMTP_destroy_file_t(prev)
-			prev = obj
 		}
+		prev = obj
 	}
 	if prev != nil {
 		C.LIBMTP_destroy_file_t(prev)
@@ -285,11 +285,11 @@ func getObjectInfo(obj *C.LIBMTP_file_t) *objects.ObjectInfo {
 }
 
 func pickDevice(serial string, verbose bool, log *zap.Logger) (usbIDs *common.PnPDeviceID, dev *C.LIBMTP_mtpdevice_t, err error) {
-	defer func(dev *C.LIBMTP_mtpdevice_t) {
+	defer func() {
 		if err != nil && dev != nil {
 			C.LIBMTP_Release_Device(dev)
 		}
-	}(dev)
+	}()
 
 	var (
 		rawdevs       *C.LIBMTP_raw_device_t
@@ -322,8 +322,8 @@ func pickDevice(serial string, verbose bool, log *zap.Logger) (usbIDs *common.Pn
 
 	rdevs := unsafe.Slice(rawdevs, int(numdevs))
 	for i := 0; i < int(numdevs); i++ {
-		dev = C.LIBMTP_Open_Raw_Device_Uncached(&rdevs[i])
-		if dev != nil {
+		candidate := C.LIBMTP_Open_Raw_Device_Uncached(&rdevs[i])
+		if candidate != nil {
 
 			vid, pid, bus, devnum := int(rdevs[i].device_entry.vendor_id),
 				int(rdevs[i].device_entry.product_id),
@@ -333,6 +333,7 @@ func pickDevice(serial string, verbose bool, log *zap.Logger) (usbIDs *common.Pn
 			var sn string
 			sn, err = getSerialNumber(vid, pid, bus, devnum)
 			if err != nil {
+				C.LIBMTP_Release_Device(candidate)
 				return nil, nil, fmt.Errorf("libmtp failed to get serial number for device '%04X:%04X:%02X:%02X': %w",
 					vid, pid, bus, devnum, err)
 			}
@@ -346,20 +347,29 @@ func pickDevice(serial string, verbose bool, log *zap.Logger) (usbIDs *common.Pn
 			)
 
 			if !supported {
+				C.LIBMTP_Release_Device(candidate)
 				continue
 			}
 
 			if len(serial) > 0 {
 				if !strings.EqualFold(serial, devIDs.Serial()) {
+					C.LIBMTP_Release_Device(candidate)
 					continue
 				}
 				// we are targeting a specific device
 			} else {
 				if !usbIDs.Empty() {
+					C.LIBMTP_Release_Device(candidate)
 					continue
 				}
 				// pick the first supported device
 			}
+
+			// Release previously selected device if any
+			if dev != nil {
+				C.LIBMTP_Release_Device(dev)
+			}
+			dev = candidate
 			usbIDs = devIDs
 
 			name := C.LIBMTP_Get_Friendlyname(dev)

@@ -26,7 +26,8 @@ type containerHeader struct {
 
 func (c *containerHeader) validate() error {
 	const (
-		maxContVersion = 2
+		maxContVersion  = 2
+		minContainerLen = 18 // Minimum CONT header length
 	)
 
 	if !bytes.Equal(c.Signature[:], []byte("CONT")) {
@@ -35,7 +36,7 @@ func (c *containerHeader) validate() error {
 	if c.Version > maxContVersion {
 		return fmt.Errorf("unsupported KFX container version: %d", c.Version)
 	}
-	if uintptr(c.Size) < unsafe.Sizeof(c) {
+	if uintptr(c.Size) < minContainerLen {
 		return fmt.Errorf("invalid KFX container header size: %d", c.Size)
 	}
 	return nil
@@ -109,7 +110,7 @@ func (e *entityHeader) validate() error {
 	if e.Version > maxEntityVersion {
 		return fmt.Errorf("unsupported KFX entity version: %d", e.Version)
 	}
-	if uintptr(e.Size) < unsafe.Sizeof(e) {
+	if uintptr(e.Size) < unsafe.Sizeof(*e) {
 		return fmt.Errorf("invalid KFX entity header size: %d", e.Size)
 	}
 	return nil

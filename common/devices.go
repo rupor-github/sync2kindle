@@ -56,8 +56,10 @@ func IsSupportedEMailFormat(ext string) bool {
 }
 
 func GetEMailContentType(ext string) string {
-	if v, ok := supportedFileFormatsForEMail[ext]; ok {
-		return v
+	for k, v := range supportedFileFormatsForEMail {
+		if strings.EqualFold(k, ext) {
+			return v
+		}
 	}
 	return "application/octet-stream"
 }

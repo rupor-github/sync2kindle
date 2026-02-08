@@ -38,7 +38,9 @@ func (v *IPortableDeviceValues) GetStringValue(key *PropertyKey) (string, error)
 	if hr != 0 {
 		return "", ole.NewError(hr)
 	}
-	return windows.UTF16PtrToString(val), nil
+	result := windows.UTF16PtrToString(val)
+	ole.CoTaskMemFree(uintptr(unsafe.Pointer(val)))
+	return result, nil
 }
 
 func (v *IPortableDeviceValues) SetUnsignedIntegerValue(key *PropertyKey, value uint32) error {
