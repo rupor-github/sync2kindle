@@ -2,11 +2,16 @@ package sync
 
 import (
 	"encoding/json"
+	"fmt"
+	"os"
+	"path"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 
+	"s2k/common"
 	"s2k/config"
 	"s2k/objects"
 )
@@ -151,40 +156,555 @@ func TestPrepareActions(t *testing.T) {
 	log := zaptest.NewLogger(t, zaptest.Level(zap.WarnLevel))
 	// log := zaptest.NewLogger(t, zaptest.Level(zap.DebugLevel))
 
-	var src, dst, hst *testActor
 	for i, c := range testPrepareActionsCases {
-		t.Logf("Test case %d", i)
-		src, err = prepareDriver("local", c.srcJson)
-		if err != nil {
-			t.Fatalf("Failed to unmarshal source object info set: %v", err)
-		}
-		dst, err = prepareDriver("device", c.dstJson)
-		if err != nil {
-			t.Fatalf("Failed to unmarshal destination object info set: %v", err)
-		}
-		hst, err = prepareDriver("history", c.hstJson)
-		if err != nil {
-			t.Fatalf("Failed to unmarshal history object info set: %v", err)
-		}
+		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
+			src, err := prepareDriver("local", c.srcJson)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal source object info set: %v", err)
+			}
+			dst, err := prepareDriver("device", c.dstJson)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal destination object info set: %v", err)
+			}
+			hst, err := prepareDriver("history", c.hstJson)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal history object info set: %v", err)
+			}
+			actions, _, err := PrepareActions(src, dst, hst, cfg, false, false, log)
+			if err != nil {
+				t.Fatalf("Failed to prepare actions: %v", err)
+			}
+			for _, action := range actions {
+				if err := action(false, log); err != nil {
+					t.Fatalf("Action failed: %v", err)
+				}
+			}
+			if c.deletions != dst.deletions+src.deletions {
+				t.Fatalf("Expected %d deletions, got %d", c.deletions, dst.deletions+src.deletions)
+			}
+			if c.additions != dst.additions+src.additions {
+				t.Fatalf("Expected %d additions, got %d", c.additions, dst.additions+src.additions)
+			}
+			if c.directories != dst.directories+src.directories {
+				t.Fatalf("Expected %d directories, got %d", c.directories, dst.directories+src.directories)
+			}
+			t.Logf("OK: directories: %d, additions: %d, deletions: %d",
+				dst.directories+src.directories, dst.additions+src.additions, dst.deletions+src.deletions)
+		})
+	}
+}
+
+// makeOIS creates an ObjectInfoSet from a list of ObjectInfo structs, keyed by FullPath.
+func makeOIS(objs ...*objects.ObjectInfo) objects.ObjectInfoSet {
+	ois := objects.New()
+	for _, o := range objs {
+		ois.Add(o.FullPath, o)
+	}
+	return ois
+}
+
+// TestPrepareActionsIgnoreDeviceRemovals tests item #46 — the ignoreDeviceRemovals flag.
+// Scenario: a book exists in local + history but was removed from device (case #7).
+// With ignoreDeviceRemovals=false the book is removed from local (src.deletions > 0).
+// With ignoreDeviceRemovals=true  the book is re-synced to device instead.
+func TestPrepareActionsIgnoreDeviceRemovals(t *testing.T) {
+	cfg, err := config.LoadConfiguration("")
+	if err != nil {
+		t.Fatalf("Failed to load configuration: %v", err)
+	}
+	cfg.SourcePath = "D:/test/out"
+	cfg.TargetPath = "documents/test"
+	log := zaptest.NewLogger(t, zaptest.Level(zap.WarnLevel))
+
+	now := time.Now()
+
+	// A book that exists locally and in history, but NOT on device (case #7).
+	book := &objects.ObjectInfo{
+		Name:         "book1.azw3",
+		PersistentID: "pid-book1",
+		File:         true,
+		Modified:     now,
+		ObjSize:      1000,
+		FullPath:     "D:/test/out/book1.azw3",
+	}
+
+	// Source root dir.
+	srcRoot := &objects.ObjectInfo{
+		Name:     "out",
+		Dir:      true,
+		Modified: now,
+		FullPath: "D:/test/out",
+	}
+
+	// Device has target dir but no books.
+	dstRoot := &objects.ObjectInfo{
+		Name:     "test",
+		Dir:      true,
+		Modified: now,
+		FullPath: "documents/test",
+	}
+	dstDocuments := &objects.ObjectInfo{
+		Name:     "documents",
+		Dir:      true,
+		Modified: now,
+		FullPath: "documents",
+	}
+
+	// History uses relative keys (same as after SubsetByPath rewriting).
+	histBook := &objects.ObjectInfo{
+		Name:         "book1.azw3",
+		PersistentID: "pid-book1",
+		File:         true,
+		Modified:     now,
+		ObjSize:      1000,
+		FullPath:     "book1.azw3",
+	}
+
+	t.Run("with_ignoreDeviceRemovals=false", func(t *testing.T) {
+		src := &testActor{name: "local", set: makeOIS(srcRoot, book)}
+		dst := &testActor{name: "device", set: makeOIS(dstDocuments, dstRoot)}
+		hst := &testActor{name: "history", set: makeOIS(histBook)}
+
 		actions, _, err := PrepareActions(src, dst, hst, cfg, false, false, log)
 		if err != nil {
-			t.Fatalf("Failed to prepare actions: %v", err)
+			t.Fatalf("PrepareActions failed: %v", err)
 		}
-		for _, action := range actions {
-			if err := action(false, log); err != nil {
+		for _, a := range actions {
+			if err := a(false, log); err != nil {
 				t.Fatalf("Action failed: %v", err)
 			}
 		}
-		if c.deletions != dst.deletions+src.deletions {
-			t.Fatalf("Expected %d deletions, got %d", c.deletions, dst.deletions+src.deletions)
+		// Case #7: book removed from device → removed from local
+		if src.deletions == 0 {
+			t.Fatalf("Expected src.deletions > 0, got %d", src.deletions)
 		}
-		if c.additions != dst.additions+src.additions {
-			t.Fatalf("Expected %d additions, got %d", c.additions, dst.additions+src.additions)
+	})
+
+	t.Run("with_ignoreDeviceRemovals=true", func(t *testing.T) {
+		src := &testActor{name: "local", set: makeOIS(srcRoot, book)}
+		dst := &testActor{name: "device", set: makeOIS(dstDocuments, dstRoot)}
+		hst := &testActor{name: "history", set: makeOIS(histBook)}
+
+		actions, _, err := PrepareActions(src, dst, hst, cfg, true, false, log)
+		if err != nil {
+			t.Fatalf("PrepareActions failed: %v", err)
 		}
-		if c.directories != dst.directories+src.directories {
-			t.Fatalf("Expected %d directories, got %d", c.directories, dst.directories+src.directories)
+		for _, a := range actions {
+			if err := a(false, log); err != nil {
+				t.Fatalf("Action failed: %v", err)
+			}
 		}
-		t.Logf("Case %d OK: directories: %d, additions: %d, deletions: %d", i,
-			dst.directories+src.directories, dst.additions+src.additions, dst.deletions+src.deletions)
+		// Case #7 skipped: book should be re-synced to device (case #3)
+		if src.deletions != 0 {
+			t.Fatalf("Expected src.deletions == 0, got %d", src.deletions)
+		}
+		if dst.additions == 0 {
+			t.Fatalf("Expected dst.additions > 0, got %d", dst.additions)
+		}
+	})
+}
+
+// TestPrepareActionsEmailMode tests item #47 — the email flag.
+func TestPrepareActionsEmailMode(t *testing.T) {
+	cfg, err := config.LoadConfiguration("")
+	if err != nil {
+		t.Fatalf("Failed to load configuration: %v", err)
 	}
+	cfg.SourcePath = "D:/test/out"
+	cfg.TargetPath = "documents/test"
+	log := zaptest.NewLogger(t, zaptest.Level(zap.WarnLevel))
+
+	now := time.Now()
+
+	srcRoot := &objects.ObjectInfo{
+		Name:     "out",
+		Dir:      true,
+		Modified: now,
+		FullPath: "D:/test/out",
+	}
+
+	// A book only in local (not history, not device) — should be sent.
+	newBook := &objects.ObjectInfo{
+		Name:         "new.azw3",
+		PersistentID: "pid-new",
+		File:         true,
+		Modified:     now,
+		ObjSize:      2000,
+		FullPath:     "D:/test/out/new.azw3",
+	}
+
+	// A book in history but NOT local — case #6 (removed locally).
+	removedBookHistory := &objects.ObjectInfo{
+		Name:         "removed.azw3",
+		PersistentID: "pid-removed",
+		File:         true,
+		Modified:     now,
+		ObjSize:      3000,
+		FullPath:     "removed.azw3",
+	}
+
+	t.Run("email=true_skips_case_6", func(t *testing.T) {
+		// In email mode the device set is replaced by history clone, and case #6
+		// is explicitly skipped. So removing from local should NOT remove from device.
+		src := &testActor{name: "local", set: makeOIS(srcRoot, newBook)}
+		dst := &testActor{name: "device", set: objects.New()} // email driver returns empty
+		hst := &testActor{name: "history", set: makeOIS(removedBookHistory)}
+
+		actions, _, err := PrepareActions(src, dst, hst, cfg, false, true, log)
+		if err != nil {
+			t.Fatalf("PrepareActions failed: %v", err)
+		}
+		for _, a := range actions {
+			if err := a(false, log); err != nil {
+				t.Fatalf("Action failed: %v", err)
+			}
+		}
+		if dst.deletions != 0 {
+			t.Fatalf("Expected no device deletions in email mode, got %d", dst.deletions)
+		}
+	})
+
+	t.Run("email=true_sends_new_books", func(t *testing.T) {
+		src := &testActor{name: "local", set: makeOIS(srcRoot, newBook)}
+		dst := &testActor{name: "device", set: objects.New()}
+		hst := &testActor{name: "history", set: objects.New()}
+
+		actions, _, err := PrepareActions(src, dst, hst, cfg, false, true, log)
+		if err != nil {
+			t.Fatalf("PrepareActions failed: %v", err)
+		}
+		for _, a := range actions {
+			if err := a(false, log); err != nil {
+				t.Fatalf("Action failed: %v", err)
+			}
+		}
+		// New book should be sent (1 addition), no directories in email mode.
+		if dst.additions == 0 {
+			t.Fatalf("Expected dst.additions > 0, got %d", dst.additions)
+		}
+		if dst.directories != 0 {
+			t.Fatalf("Expected no directories in email mode, got %d", dst.directories)
+		}
+	})
+}
+
+// TestPrepareActionsChangedBooks tests item #48 — changed book detection via PersistentID.
+func TestPrepareActionsChangedBooks(t *testing.T) {
+	cfg, err := config.LoadConfiguration("")
+	if err != nil {
+		t.Fatalf("Failed to load configuration: %v", err)
+	}
+	cfg.SourcePath = "D:/test/out"
+	cfg.TargetPath = "documents/test"
+	log := zaptest.NewLogger(t, zaptest.Level(zap.WarnLevel))
+
+	now := time.Now()
+
+	srcRoot := &objects.ObjectInfo{
+		Name:     "out",
+		Dir:      true,
+		Modified: now,
+		FullPath: "D:/test/out",
+	}
+
+	dstRoot := &objects.ObjectInfo{
+		Name:     "test",
+		Dir:      true,
+		Modified: now,
+		FullPath: "documents/test",
+	}
+	dstDocuments := &objects.ObjectInfo{
+		Name:     "documents",
+		Dir:      true,
+		Modified: now,
+		FullPath: "documents",
+	}
+
+	t.Run("changed_book_triggers_remove_and_copy", func(t *testing.T) {
+		// Local version has different PersistentID than history → book changed.
+		localBook := &objects.ObjectInfo{
+			Name:         "book.azw3",
+			PersistentID: "pid-v2",
+			File:         true,
+			Modified:     now,
+			ObjSize:      5000,
+			FullPath:     "D:/test/out/book.azw3",
+		}
+		histBook := &objects.ObjectInfo{
+			Name:         "book.azw3",
+			PersistentID: "pid-v1",
+			File:         true,
+			Modified:     now.Add(-time.Hour),
+			ObjSize:      4000,
+			FullPath:     "book.azw3",
+		}
+		deviceBook := &objects.ObjectInfo{
+			Name:         "book.azw3",
+			PersistentID: "pid-v1",
+			File:         true,
+			Modified:     now.Add(-time.Hour),
+			ObjSize:      4000,
+			FullPath:     "documents/test/book.azw3",
+		}
+
+		src := &testActor{name: "local", set: makeOIS(srcRoot, localBook)}
+		dst := &testActor{name: "device", set: makeOIS(dstDocuments, dstRoot, deviceBook)}
+		hst := &testActor{name: "history", set: makeOIS(histBook)}
+
+		actions, _, err := PrepareActions(src, dst, hst, cfg, false, false, log)
+		if err != nil {
+			t.Fatalf("PrepareActions failed: %v", err)
+		}
+		for _, a := range actions {
+			if err := a(false, log); err != nil {
+				t.Fatalf("Action failed: %v", err)
+			}
+		}
+		// Changed book: old version removed + new version copied.
+		if dst.deletions == 0 {
+			t.Fatalf("Expected dst.deletions > 0 for changed book, got %d", dst.deletions)
+		}
+		if dst.additions == 0 {
+			t.Fatalf("Expected dst.additions > 0 for changed book, got %d", dst.additions)
+		}
+	})
+
+	t.Run("unchanged_book_has_no_actions", func(t *testing.T) {
+		// Same PersistentID in local + history + device → no actions (case #8).
+		localBook := &objects.ObjectInfo{
+			Name:         "book.azw3",
+			PersistentID: "pid-same",
+			File:         true,
+			Modified:     now,
+			ObjSize:      5000,
+			FullPath:     "D:/test/out/book.azw3",
+		}
+		histBook := &objects.ObjectInfo{
+			Name:         "book.azw3",
+			PersistentID: "pid-same",
+			File:         true,
+			Modified:     now,
+			ObjSize:      5000,
+			FullPath:     "book.azw3",
+		}
+		deviceBook := &objects.ObjectInfo{
+			Name:         "book.azw3",
+			PersistentID: "pid-same",
+			File:         true,
+			Modified:     now,
+			ObjSize:      5000,
+			FullPath:     "documents/test/book.azw3",
+		}
+
+		src := &testActor{name: "local", set: makeOIS(srcRoot, localBook)}
+		dst := &testActor{name: "device", set: makeOIS(dstDocuments, dstRoot, deviceBook)}
+		hst := &testActor{name: "history", set: makeOIS(histBook)}
+
+		actions, _, err := PrepareActions(src, dst, hst, cfg, false, false, log)
+		if err != nil {
+			t.Fatalf("PrepareActions failed: %v", err)
+		}
+		for _, a := range actions {
+			if err := a(false, log); err != nil {
+				t.Fatalf("Action failed: %v", err)
+			}
+		}
+		if dst.deletions+dst.additions+src.deletions+src.additions != 0 {
+			t.Fatalf("Expected no actions for unchanged book, got deletions=%d, additions=%d",
+				dst.deletions+src.deletions, dst.additions+src.additions)
+		}
+	})
+}
+
+// TestPrepareActionsThumbnails tests item #49 — thumbnail synchronization.
+func TestPrepareActionsThumbnails(t *testing.T) {
+	cfg, err := config.LoadConfiguration("")
+	if err != nil {
+		t.Fatalf("Failed to load configuration: %v", err)
+	}
+	cfg.SourcePath = "D:/test/out"
+	cfg.TargetPath = "documents/test"
+	log := zaptest.NewLogger(t, zaptest.Level(zap.WarnLevel))
+
+	now := time.Now()
+
+	srcRoot := &objects.ObjectInfo{
+		Name:     "out",
+		Dir:      true,
+		Modified: now,
+		FullPath: "D:/test/out",
+	}
+
+	dstDocuments := &objects.ObjectInfo{
+		Name:     "documents",
+		Dir:      true,
+		Modified: now,
+		FullPath: "documents",
+	}
+	dstRoot := &objects.ObjectInfo{
+		Name:     "test",
+		Dir:      true,
+		Modified: now,
+		FullPath: "documents/test",
+	}
+	thumbDir := &objects.ObjectInfo{
+		Name:     "thumbnails",
+		Dir:      true,
+		Modified: now,
+		FullPath: common.ThumbnailFolder,
+	}
+	systemDir := &objects.ObjectInfo{
+		Name:     "system",
+		Dir:      true,
+		Modified: now,
+		FullPath: "system",
+	}
+
+	t.Run("thumbnail_copied_for_new_book", func(t *testing.T) {
+		// Set up a temp dir with a fake thumbnail file.
+		tmpDir := t.TempDir()
+		cfg.Thumbnails.Dir = tmpDir
+		thumbFile := path.Join(tmpDir, "thumb_book1.jpg")
+		if err := os.WriteFile(thumbFile, []byte("fake-thumb-data"), 0644); err != nil {
+			t.Fatalf("Failed to write thumbnail file: %v", err)
+		}
+
+		newBook := &objects.ObjectInfo{
+			Name:         "book1.azw3",
+			PersistentID: "pid-book1",
+			File:         true,
+			Modified:     now,
+			ObjSize:      1000,
+			FullPath:     "D:/test/out/book1.azw3",
+			ThumbName:    "thumb_book1.jpg",
+		}
+
+		src := &testActor{name: "local", set: makeOIS(srcRoot, newBook)}
+		dst := &testActor{name: "device", set: makeOIS(dstDocuments, dstRoot, systemDir, thumbDir)}
+		hst := &testActor{name: "history", set: objects.New()}
+
+		actions, _, err := PrepareActions(src, dst, hst, cfg, false, false, log)
+		if err != nil {
+			t.Fatalf("PrepareActions failed: %v", err)
+		}
+		for _, a := range actions {
+			if err := a(false, log); err != nil {
+				t.Fatalf("Action failed: %v", err)
+			}
+		}
+		// Should have book copy + thumbnail copy (at least 2 additions).
+		if dst.additions < 2 {
+			t.Fatalf("Expected at least 2 additions (book + thumbnail), got %d", dst.additions)
+		}
+	})
+
+	t.Run("thumbnail_removed_when_book_removed_from_local", func(t *testing.T) {
+		// Book exists on device + history (with thumb) but NOT locally → case #6.
+		deviceBook := &objects.ObjectInfo{
+			Name:         "book2.azw3",
+			PersistentID: "pid-book2",
+			File:         true,
+			Modified:     now,
+			ObjSize:      2000,
+			FullPath:     "documents/test/book2.azw3",
+			ThumbName:    "thumb_book2.jpg",
+		}
+		histBook := &objects.ObjectInfo{
+			Name:         "book2.azw3",
+			PersistentID: "pid-book2",
+			File:         true,
+			Modified:     now,
+			ObjSize:      2000,
+			FullPath:     "book2.azw3",
+			ThumbName:    "thumb_book2.jpg",
+		}
+		deviceThumb := &objects.ObjectInfo{
+			Name:     "thumb_book2.jpg",
+			File:     true,
+			Modified: now,
+			ObjSize:  500,
+			FullPath: fmt.Sprintf("%s/thumb_book2.jpg", common.ThumbnailFolder),
+		}
+
+		// We need a separate local book so PrepareActions doesn't error on "no books".
+		otherBook := &objects.ObjectInfo{
+			Name:         "other.azw3",
+			PersistentID: "pid-other",
+			File:         true,
+			Modified:     now,
+			ObjSize:      999,
+			FullPath:     "D:/test/out/other.azw3",
+		}
+		otherDeviceBook := &objects.ObjectInfo{
+			Name:         "other.azw3",
+			PersistentID: "pid-other",
+			File:         true,
+			Modified:     now,
+			ObjSize:      999,
+			FullPath:     "documents/test/other.azw3",
+		}
+		otherHistBook := &objects.ObjectInfo{
+			Name:         "other.azw3",
+			PersistentID: "pid-other",
+			File:         true,
+			Modified:     now,
+			ObjSize:      999,
+			FullPath:     "other.azw3",
+		}
+
+		src := &testActor{name: "local", set: makeOIS(srcRoot, otherBook)}
+		dst := &testActor{name: "device", set: makeOIS(dstDocuments, dstRoot, systemDir, thumbDir, deviceBook, deviceThumb, otherDeviceBook)}
+		hst := &testActor{name: "history", set: makeOIS(histBook, otherHistBook)}
+
+		actions, _, err := PrepareActions(src, dst, hst, cfg, false, false, log)
+		if err != nil {
+			t.Fatalf("PrepareActions failed: %v", err)
+		}
+		for _, a := range actions {
+			if err := a(false, log); err != nil {
+				t.Fatalf("Action failed: %v", err)
+			}
+		}
+		// Should remove book + thumbnail (at least 2 deletions).
+		if dst.deletions < 2 {
+			t.Fatalf("Expected at least 2 device deletions (book + thumbnail), got %d", dst.deletions)
+		}
+	})
+
+	t.Run("no_thumbnail_in_email_mode", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		cfg.Thumbnails.Dir = tmpDir
+		thumbFile := path.Join(tmpDir, "thumb_book3.jpg")
+		if err := os.WriteFile(thumbFile, []byte("fake-thumb-data"), 0644); err != nil {
+			t.Fatalf("Failed to write thumbnail file: %v", err)
+		}
+
+		newBook := &objects.ObjectInfo{
+			Name:         "book3.azw3",
+			PersistentID: "pid-book3",
+			File:         true,
+			Modified:     now,
+			ObjSize:      1000,
+			FullPath:     "D:/test/out/book3.azw3",
+			ThumbName:    "thumb_book3.jpg",
+		}
+
+		src := &testActor{name: "local", set: makeOIS(srcRoot, newBook)}
+		dst := &testActor{name: "device", set: objects.New()} // email driver returns empty
+		hst := &testActor{name: "history", set: objects.New()}
+
+		actions, _, err := PrepareActions(src, dst, hst, cfg, false, true, log)
+		if err != nil {
+			t.Fatalf("PrepareActions failed: %v", err)
+		}
+		for _, a := range actions {
+			if err := a(false, log); err != nil {
+				t.Fatalf("Action failed: %v", err)
+			}
+		}
+		// Email mode: exactly 1 addition (the book), no thumbnail.
+		if dst.additions != 1 {
+			t.Fatalf("Expected exactly 1 addition in email mode (book only), got %d", dst.additions)
+		}
+	})
 }
