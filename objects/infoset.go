@@ -97,7 +97,7 @@ func (os ObjectInfoSet) SubsetByPath(dir string) ObjectInfoSet {
 		} else if base == dir {
 			continue
 		}
-		if strings.HasPrefix(base, dir) {
+		if strings.HasPrefix(base, dir+"/") || base == dir {
 			nos[strings.TrimPrefix(k, dir+"/")] = v
 		}
 	}

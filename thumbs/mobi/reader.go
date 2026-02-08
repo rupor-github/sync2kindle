@@ -80,9 +80,16 @@ func (r *Reader) SaveResult(dir string) (string, error) {
 }
 
 func (r *Reader) extractThumbnail(data []byte) error {
-	rec0 := readSection(data, 0)
+	rec0, err := readSection(data, 0)
+	if err != nil {
+		return fmt.Errorf("unable to read section 0: %w", err)
+	}
 
-	if getInt16(rec0, cryptoType) != 0 {
+	ct, err := getInt16(rec0, cryptoType)
+	if err != nil {
+		return fmt.Errorf("unable to read crypto type: %w", err)
+	}
+	if ct != 0 {
 		return errors.New("encrypted books are not supported")
 	}
 
@@ -91,51 +98,77 @@ func (r *Reader) extractThumbnail(data []byte) error {
 		kfrec0 []byte
 	)
 
-	kf8off := readExth(rec0, exthKF8Offset)
+	kf8off, err := readExth(rec0, exthKF8Offset)
+	if err != nil {
+		return fmt.Errorf("unable to read KF8 offset: %w", err)
+	}
 	if len(kf8off) > 0 {
 		// only pay attention to first KF8 offfset - there should only be one
-		if kf8 = getInt32(kf8off[0], 0); kf8 >= 0 {
-			kfrec0 = readSection(data, kf8)
+		if kf8, err = getInt32(kf8off[0], 0); err == nil && kf8 >= 0 {
+			kfrec0, err = readSection(data, kf8)
+			if err != nil {
+				return fmt.Errorf("unable to read KF8 section: %w", err)
+			}
 		}
 	}
 	combo := len(kfrec0) > 0 && kf8 >= 0
 
 	// save ACR
 	const alphabet = `- ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789`
-	r.acr = bytes.Map(func(sym rune) rune {
-		if sym == 0 {
-			return -1
-		}
-		if strings.ContainsRune(alphabet, sym) {
-			return sym
-		}
-		return '_'
-	}, data[0:32])
+	if len(data) >= 32 {
+		r.acr = bytes.Map(func(sym rune) rune {
+			if sym == 0 {
+				return -1
+			}
+			if strings.ContainsRune(alphabet, sym) {
+				return sym
+			}
+			return '_'
+		}, data[0:32])
+	}
 
-	exth := readExth(rec0, exthASIN)
+	exth, err := readExth(rec0, exthASIN)
+	if err != nil {
+		return fmt.Errorf("unable to read ASIN: %w", err)
+	}
 	if len(exth) > 0 {
 		r.asin = exth[0]
 	}
-	exth = readExth(rec0, exthCDEType)
+	exth, err = readExth(rec0, exthCDEType)
+	if err != nil {
+		return fmt.Errorf("unable to read CDE type: %w", err)
+	}
 	if len(exth) > 0 {
 		r.cdetype = exth[0]
 	}
-	exth = readExth(rec0, exthCDEContentKey)
+	exth, err = readExth(rec0, exthCDEContentKey)
+	if err != nil {
+		return fmt.Errorf("unable to read CDE content key: %w", err)
+	}
 	if len(exth) > 0 {
 		r.cdekey = exth[0]
 	}
 
 	// always prefer data from KF8
 	if combo {
-		exth = readExth(kfrec0, exthASIN)
+		exth, err = readExth(kfrec0, exthASIN)
+		if err != nil {
+			return fmt.Errorf("unable to read KF8 ASIN: %w", err)
+		}
 		if len(exth) > 0 {
 			r.asin = exth[0]
 		}
-		exth = readExth(kfrec0, exthCDEType)
+		exth, err = readExth(kfrec0, exthCDEType)
+		if err != nil {
+			return fmt.Errorf("unable to read KF8 CDE type: %w", err)
+		}
 		if len(exth) > 0 {
 			r.cdetype = exth[0]
 		}
-		exth = readExth(kfrec0, exthCDEContentKey)
+		exth, err = readExth(kfrec0, exthCDEContentKey)
+		if err != nil {
+			return fmt.Errorf("unable to read KF8 CDE content key: %w", err)
+		}
 		if len(exth) > 0 {
 			r.cdekey = exth[0]
 		}
@@ -146,19 +179,34 @@ func (r *Reader) extractThumbnail(data []byte) error {
 		return nil
 	}
 
-	firstimage := getInt32(rec0, firstRescRecord)
-	exthCover := readExth(rec0, exthCoverOffset)
+	firstimage, err := getInt32(rec0, firstRescRecord)
+	if err != nil {
+		return fmt.Errorf("unable to read first resource record: %w", err)
+	}
+	exthCover, err := readExth(rec0, exthCoverOffset)
+	if err != nil {
+		return fmt.Errorf("unable to read cover offset: %w", err)
+	}
 	coverIndex := -1
 	if len(exthCover) > 0 {
-		coverIndex = getInt32(exthCover[0], 0)
-		coverIndex += firstimage
+		ci, err := getInt32(exthCover[0], 0)
+		if err != nil {
+			return fmt.Errorf("unable to read cover index: %w", err)
+		}
+		coverIndex = ci + firstimage
 	}
 
-	exthThumb := readExth(rec0, exthThumbOffset)
+	exthThumb, err := readExth(rec0, exthThumbOffset)
+	if err != nil {
+		return fmt.Errorf("unable to read thumb offset: %w", err)
+	}
 	thumbIndex := -1
 	if len(exthThumb) > 0 {
-		thumbIndex = getInt32(exthThumb[0], 0)
-		thumbIndex += firstimage
+		ti, err := getInt32(exthThumb[0], 0)
+		if err != nil {
+			return fmt.Errorf("unable to read thumb index: %w", err)
+		}
+		thumbIndex = ti + firstimage
 	}
 
 	if coverIndex < 0 {
@@ -167,11 +215,13 @@ func (r *Reader) extractThumbnail(data []byte) error {
 
 	var (
 		img  image.Image
-		err  error
 		w, h = 0, 0
 	)
 	if thumbIndex >= 0 {
-		thumb := readSection(data, thumbIndex)
+		thumb, err := readSection(data, thumbIndex)
+		if err != nil {
+			return fmt.Errorf("unable to read thumbnail section: %w", err)
+		}
 		if img, _, err = image.Decode(bytes.NewReader(thumb)); err != nil {
 			return fmt.Errorf("unable to decode extracted thumbnail: %w", err)
 		}
@@ -186,7 +236,10 @@ func (r *Reader) extractThumbnail(data []byte) error {
 		}
 	} else {
 		// recreate thumbnail from cover image if possible
-		thumb := readSection(data, coverIndex)
+		thumb, err := readSection(data, coverIndex)
+		if err != nil {
+			return fmt.Errorf("unable to read cover section: %w", err)
+		}
 		if img, _, err = image.Decode(bytes.NewReader(thumb)); err != nil {
 			return fmt.Errorf("unable to decode extracted thumbnail: %w", err)
 		}

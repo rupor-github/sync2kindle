@@ -387,6 +387,7 @@ func (d *Device) enumerateObjects(
 		d.log.Warn("EnumObjects failed, ignoring", zap.String("root", root), zap.Stringer("obj", id), zap.Error(err))
 		return infos
 	}
+	defer objects.Release()
 
 	for {
 		oids, err := objects.Next(1)
@@ -658,6 +659,7 @@ func (d *Device) fillStorageInfo() (propSet, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to EnumObjects: %w", err)
 	}
+	defer objects.Release()
 
 	oids, err := objects.Next(1)
 	if err != nil {

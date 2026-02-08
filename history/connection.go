@@ -34,6 +34,7 @@ func Connect(path string, log *zap.Logger) (*Connection, error) {
 	}
 	stepID, err := lastStep(conn)
 	if err != nil {
+		conn.Close()
 		return nil, fmt.Errorf("unable to read last history step value: %w", err)
 	}
 	return &Connection{log: log.Named(driverName), conn: conn, stepID: stepID}, nil

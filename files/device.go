@@ -67,30 +67,32 @@ func (d *Device) MkDir(obj *objects.ObjectInfo) (err error) {
 	if obj == nil {
 		panic("MkDir is called with nil object")
 	}
+	fullPath := obj.FullPath
 	if len(d.mount) > 0 {
-		obj.FullPath = path.Join(d.mount, obj.FullPath)
+		fullPath = path.Join(d.mount, fullPath)
 	}
 
 	defer func(start time.Time) {
 		d.log.Debug("Executed action MkDir", zap.String("actor", d.Name()), zap.Any("object", obj), zap.Duration("elapsed", time.Since(start)), zap.Error(err))
 	}(time.Now())
 
-	return os.Mkdir(obj.FullPath, 0755)
+	return os.Mkdir(fullPath, 0755)
 }
 
 func (d *Device) Remove(obj *objects.ObjectInfo) (err error) {
 	if obj == nil {
 		panic("Remove is called with nil object")
 	}
+	fullPath := obj.FullPath
 	if len(d.mount) > 0 {
-		obj.FullPath = path.Join(d.mount, obj.FullPath)
+		fullPath = path.Join(d.mount, fullPath)
 	}
 
 	defer func(start time.Time) {
 		d.log.Debug("Executed action Remove", zap.String("actor", d.Name()), zap.Any("object", obj), zap.Duration("elapsed", time.Since(start)), zap.Error(err))
 	}(time.Now())
 
-	return os.Remove(obj.FullPath)
+	return os.Remove(fullPath)
 }
 
 func (d *Device) Copy(obj *objects.ObjectInfo) (err error) {
@@ -98,8 +100,9 @@ func (d *Device) Copy(obj *objects.ObjectInfo) (err error) {
 		panic("Copy is called with nil object")
 	}
 
+	fullPath := obj.FullPath
 	if len(d.mount) > 0 {
-		obj.FullPath = path.Join(d.mount, obj.FullPath)
+		fullPath = path.Join(d.mount, fullPath)
 	}
 
 	defer func(start time.Time) {
@@ -112,23 +115,23 @@ func (d *Device) Copy(obj *objects.ObjectInfo) (err error) {
 	}
 	defer from.Close()
 
-	to, err := os.OpenFile(obj.FullPath, os.O_RDWR|os.O_CREATE, 0755)
+	to, err := os.OpenFile(fullPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
-		return fmt.Errorf("unable to create destination file '%s': %w", obj.FullPath, err)
+		return fmt.Errorf("unable to create destination file '%s': %w", fullPath, err)
 	}
 	defer func(f *os.File) {
 		if err := f.Close(); err != nil {
-			d.log.Warn("Unable to close destination file", zap.String("path", obj.FullPath), zap.Error(err))
+			d.log.Warn("Unable to close destination file", zap.String("path", fullPath), zap.Error(err))
 		}
 	}(to)
 
 	// our files are typically quite small...
 	written, err := io.CopyBuffer(to, from, make([]byte, 256*1024))
 	if err != nil {
-		return fmt.Errorf("failed to copy file '%s' to '%s': %w", obj.ObjectName, obj.FullPath, err)
+		return fmt.Errorf("failed to copy file '%s' to '%s': %w", obj.ObjectName, fullPath, err)
 	}
 	if written != obj.ObjSize {
-		return fmt.Errorf("failed to Copy file '%s' (%d) to '%s' (%d), not all bytes have been written", obj.ObjectName, obj.ObjSize, obj.FullPath, written)
+		return fmt.Errorf("failed to Copy file '%s' (%d) to '%s' (%d), not all bytes have been written", obj.ObjectName, obj.ObjSize, fullPath, written)
 	}
 	return nil
 }

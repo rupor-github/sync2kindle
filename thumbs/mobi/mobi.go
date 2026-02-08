@@ -47,47 +47,91 @@ const (
 	exthCDEContentKey = 504
 )
 
-func getInt16(data []byte, ofs int) int {
-	return int(binary.BigEndian.Uint16(data[ofs:]))
+func getInt16(data []byte, ofs int) (int, error) {
+	if ofs < 0 || ofs+2 > len(data) {
+		return 0, fmt.Errorf("getInt16: offset %d out of bounds (len %d)", ofs, len(data))
+	}
+	return int(binary.BigEndian.Uint16(data[ofs:])), nil
 }
 
-func getInt32(data []byte, ofs int) int {
-	// in the up to date mobi format, all those are uint32 but I am yet to encounter a situation when int32 is not enough.
-	return int(int32(binary.BigEndian.Uint32(data[ofs:])))
+func getInt32(data []byte, ofs int) (int, error) {
+	if ofs < 0 || ofs+4 > len(data) {
+		return 0, fmt.Errorf("getInt32: offset %d out of bounds (len %d)", ofs, len(data))
+	}
+	return int(binary.BigEndian.Uint32(data[ofs:])), nil
 }
 
-func getSectionAddr(data []byte, secno int) (int, int) {
+func getSectionAddr(data []byte, secno int) (int, int, error) {
 
-	nsec := getInt16(data, numberOfPdbRecords)
+	nsec, err := getInt16(data, numberOfPdbRecords)
+	if err != nil {
+		return 0, 0, fmt.Errorf("getSectionAddr: %w", err)
+	}
 	if secno < 0 || secno >= nsec {
-		panic(fmt.Sprintf("secno %d is out of range [0, %d]", secno, nsec))
+		return 0, 0, fmt.Errorf("secno %d is out of range [0, %d)", secno, nsec)
 	}
 
 	var start, end int
-	start = getInt32(data, firstPdbRecord+secno*8)
+	start, err = getInt32(data, firstPdbRecord+secno*8)
+	if err != nil {
+		return 0, 0, fmt.Errorf("getSectionAddr start: %w", err)
+	}
 	if secno == nsec-1 {
 		end = len(data)
 	} else {
-		end = getInt32(data, firstPdbRecord+(secno+1)*8)
+		end, err = getInt32(data, firstPdbRecord+(secno+1)*8)
+		if err != nil {
+			return 0, 0, fmt.Errorf("getSectionAddr end: %w", err)
+		}
 	}
-	return start, end
+	if start < 0 || end < 0 || start > len(data) || end > len(data) || start > end {
+		return 0, 0, fmt.Errorf("getSectionAddr: invalid section bounds [%d, %d) for data length %d", start, end, len(data))
+	}
+	return start, end, nil
 }
 
-func getExthParams(rec0 []byte) (int, int, int) {
-	ebase := mobiHeaderBase + getInt32(rec0, mobiHeaderLength)
-	return ebase, getInt32(rec0, ebase+4), getInt32(rec0, ebase+8)
+func getExthParams(rec0 []byte) (int, int, int, error) {
+	headerLen, err := getInt32(rec0, mobiHeaderLength)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("getExthParams headerLen: %w", err)
+	}
+	ebase := mobiHeaderBase + headerLen
+	numItems, err := getInt32(rec0, ebase+4)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("getExthParams numItems: %w", err)
+	}
+	numRecords, err := getInt32(rec0, ebase+8)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("getExthParams numRecords: %w", err)
+	}
+	return ebase, numItems, numRecords, nil
 }
 
-func readExth(rec0 []byte, recnum int) [][]byte {
+func readExth(rec0 []byte, recnum int) ([][]byte, error) {
 
 	var values [][]byte
 
-	ebase, _, enum := getExthParams(rec0)
+	ebase, _, enum, err := getExthParams(rec0)
+	if err != nil {
+		return nil, err
+	}
 	ebase += 12
 
 	for enum > 0 {
-		exthID := getInt32(rec0, ebase)
-		exthLen := getInt32(rec0, ebase+4)
+		exthID, err := getInt32(rec0, ebase)
+		if err != nil {
+			return nil, fmt.Errorf("readExth exthID: %w", err)
+		}
+		exthLen, err := getInt32(rec0, ebase+4)
+		if err != nil {
+			return nil, fmt.Errorf("readExth exthLen: %w", err)
+		}
+		if exthLen < 8 {
+			return nil, fmt.Errorf("readExth: invalid exth record length %d", exthLen)
+		}
+		if ebase+exthLen > len(rec0) {
+			return nil, fmt.Errorf("readExth: exth record extends beyond data (offset %d, len %d, data len %d)", ebase, exthLen, len(rec0))
+		}
 		if exthID == recnum {
 			// We might have multiple exths, so build a list.
 			values = append(values, rec0[ebase+8:ebase+exthLen])
@@ -95,10 +139,13 @@ func readExth(rec0 []byte, recnum int) [][]byte {
 		enum--
 		ebase += exthLen
 	}
-	return values
+	return values, nil
 }
 
-func readSection(data []byte, secno int) []byte {
-	start, end := getSectionAddr(data, secno)
-	return data[start:end]
+func readSection(data []byte, secno int) ([]byte, error) {
+	start, end, err := getSectionAddr(data, secno)
+	if err != nil {
+		return nil, err
+	}
+	return data[start:end], nil
 }
