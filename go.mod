@@ -1,6 +1,6 @@
 module s2k
 
-go 1.25.7
+go 1.26.0
 
 tool honnef.co/go/tools/cmd/staticcheck
 
@@ -15,7 +15,7 @@ require (
 	github.com/urfave/cli/v3 v3.6.2
 	go.uber.org/zap v1.27.1
 	golang.org/x/sys v0.41.0
-	golang.org/x/term v0.39.0
+	golang.org/x/term v0.40.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/yaml.v3 v3.0.1
 	zombiezen.com/go/sqlite v1.4.2
@@ -34,19 +34,19 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.47.0 // indirect
-	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
-	golang.org/x/exp/typeparams v0.0.0-20260112195511-716be5621a96 // indirect
-	golang.org/x/image v0.35.0 // indirect
-	golang.org/x/mod v0.32.0 // indirect
+	golang.org/x/crypto v0.48.0 // indirect
+	golang.org/x/exp v0.0.0-20260211191109-2735e65f0518 // indirect
+	golang.org/x/exp/typeparams v0.0.0-20260211191109-2735e65f0518 // indirect
+	golang.org/x/image v0.36.0 // indirect
+	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
-	golang.org/x/tools v0.41.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/tools v0.42.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	honnef.co/go/tools v0.6.1 // indirect
 	modernc.org/ccgo/v4 v4.30.2 // indirect
 	modernc.org/libc v1.67.7 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.44.3 // indirect
+	modernc.org/sqlite v1.45.0 // indirect
 )

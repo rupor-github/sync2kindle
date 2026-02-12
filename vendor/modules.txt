@@ -80,22 +80,22 @@ go.uber.org/zap/internal/stacktrace
 go.uber.org/zap/internal/ztest
 go.uber.org/zap/zapcore
 go.uber.org/zap/zaptest
-# golang.org/x/crypto v0.47.0
+# golang.org/x/crypto v0.48.0
 ## explicit; go 1.24.0
 golang.org/x/crypto/sha3
-# golang.org/x/exp v0.0.0-20260112195511-716be5621a96
-## explicit; go 1.24.0
+# golang.org/x/exp v0.0.0-20260211191109-2735e65f0518
+## explicit; go 1.25.0
 golang.org/x/exp/constraints
-# golang.org/x/exp/typeparams v0.0.0-20260112195511-716be5621a96
-## explicit; go 1.24.0
+# golang.org/x/exp/typeparams v0.0.0-20260211191109-2735e65f0518
+## explicit; go 1.25.0
 golang.org/x/exp/typeparams
-# golang.org/x/image v0.35.0
+# golang.org/x/image v0.36.0
 ## explicit; go 1.24.0
 golang.org/x/image/bmp
 golang.org/x/image/ccitt
 golang.org/x/image/tiff
 golang.org/x/image/tiff/lzw
-# golang.org/x/mod v0.32.0
+# golang.org/x/mod v0.33.0
 ## explicit; go 1.24.0
 golang.org/x/mod/semver
 # golang.org/x/sync v0.19.0
@@ -108,16 +108,16 @@ golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.39.0
+# golang.org/x/term v0.40.0
 ## explicit; go 1.24.0
 golang.org/x/term
-# golang.org/x/text v0.33.0
+# golang.org/x/text v0.34.0
 ## explicit; go 1.24.0
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
 golang.org/x/text/language
-# golang.org/x/tools v0.41.0
+# golang.org/x/tools v0.42.0
 ## explicit; go 1.24.0
 golang.org/x/tools/go/analysis
 golang.org/x/tools/go/analysis/passes/inspect
@@ -392,7 +392,7 @@ modernc.org/mathutil
 # modernc.org/memory v1.11.0
 ## explicit; go 1.23.0
 modernc.org/memory
-# modernc.org/sqlite v1.44.3
+# modernc.org/sqlite v1.45.0
 ## explicit; go 1.24.0
 modernc.org/sqlite/lib
 # zombiezen.com/go/sqlite v1.4.2
