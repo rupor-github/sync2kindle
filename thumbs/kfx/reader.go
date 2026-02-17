@@ -97,7 +97,7 @@ func (r *Reader) extractThumbnail(data []byte) error {
 	var tableEntry indexTableEntry
 	indexTableReader := bytes.NewReader(data[contInfo.IndexTabOffset : contInfo.IndexTabOffset+contInfo.IndexTabLength])
 	for {
-		if err := tableEntry.readFrom(indexTableReader, contHeader.Size, len(data), docSymbols); err != nil {
+		if err := tableEntry.readFrom(indexTableReader, contHeader.Size, len(data)); err != nil {
 			if errors.Is(err, io.EOF) {
 				break
 			}

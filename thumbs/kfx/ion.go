@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	largestKnownSymbol = 834
+	largestKnownSymbol = 851
 )
 
 var (

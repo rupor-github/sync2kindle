@@ -75,7 +75,7 @@ type indexTableEntry struct {
 	Offset, Size   uint64
 }
 
-func (e *indexTableEntry) readFrom(r io.Reader, start uint32, limit int, st ion.SymbolTable) error {
+func (e *indexTableEntry) readFrom(r io.Reader, start uint32, limit int) error {
 	*e = indexTableEntry{}
 
 	if err := readDataFrom(r, e); err != nil {
@@ -83,12 +83,6 @@ func (e *indexTableEntry) readFrom(r io.Reader, start uint32, limit int, st ion.
 	}
 	if uint64(start)+e.Offset > uint64(limit) {
 		return fmt.Errorf("entity is out of bounds: %d + %d > %d", uint64(start)+e.Offset, e.Size, limit)
-	}
-	if _, ok := st.FindByID(uint64(e.NumID)); !ok {
-		return fmt.Errorf("entity ID not found in the symbol table: %d", e.NumID)
-	}
-	if _, ok := st.FindByID(uint64(e.NumType)); !ok {
-		return fmt.Errorf("entity type not found in the symbol table: %d", e.NumType)
 	}
 	return nil
 }
