@@ -15,7 +15,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/disintegration/imaging"
 	"go.uber.org/zap"
 
 	"s2k/thumbs/imgutils"
@@ -187,16 +186,15 @@ func (r *Reader) extractThumbnail(data []byte) error {
 	if img, _, err = image.Decode(bytes.NewReader(coverImgEnty.data)); err != nil {
 		return fmt.Errorf("unable to decode extracted cover: %w", err)
 	}
-	imgthumb := imaging.Thumbnail(img, r.width, r.height, imaging.Lanczos)
+	imgthumb := imgutils.Thumbnail(img, r.width, r.height)
 	if imgthumb == nil {
 		return errors.New("unable to resize extracted cover")
 	}
 
-	var buf = new(bytes.Buffer)
-	if err := imaging.Encode(buf, imgthumb, imaging.JPEG, imaging.JPEGQuality(75)); err != nil {
+	buf, err := imgutils.EncodeJPEG(imgthumb, 75)
+	if err != nil {
 		return fmt.Errorf("unable to encode produced thumbnail: %w", err)
 	}
-	buf, _ = imgutils.SetJpegDPI(buf, imgutils.DpiPxPerInch, 300, 300)
 	r.thumbnail = buf.Bytes()
 
 	return nil

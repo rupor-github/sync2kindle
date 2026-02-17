@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/disintegration/imaging"
 	"go.uber.org/zap"
 
 	"s2k/thumbs/imgutils"
@@ -230,7 +229,8 @@ func (r *Reader) extractThumbnail(data []byte) error {
 	var buf = new(bytes.Buffer)
 	if img != nil && w > r.width && h > r.height {
 		// thumbnail is big enough, use it as is but always convert to JPEG
-		if err := imaging.Encode(buf, img, imaging.JPEG, imaging.JPEGQuality(75)); err != nil {
+		var err error
+		if buf, err = imgutils.EncodeJPEG(img, 75); err != nil {
 			// NOTE: old code ignored this and tried to extract from the cover instead
 			return fmt.Errorf("unable to encode extracted thumbnail: %w", err)
 		}
@@ -243,15 +243,14 @@ func (r *Reader) extractThumbnail(data []byte) error {
 		if img, _, err = image.Decode(bytes.NewReader(thumb)); err != nil {
 			return fmt.Errorf("unable to decode extracted thumbnail: %w", err)
 		}
-		imgthumb := imaging.Thumbnail(img, r.width, r.height, imaging.Lanczos)
+		imgthumb := imgutils.Thumbnail(img, r.width, r.height)
 		if imgthumb == nil {
 			return errors.New("unable to resize extracted cover")
 		}
-		if err := imaging.Encode(buf, imgthumb, imaging.JPEG, imaging.JPEGQuality(75)); err != nil {
+		if buf, err = imgutils.EncodeJPEG(imgthumb, 75); err != nil {
 			return fmt.Errorf("unable to encode produced thumbnail: %w", err)
 		}
 	}
-	buf, _ = imgutils.SetJpegDPI(buf, imgutils.DpiPxPerInch, 300, 300)
 	r.thumbnail = buf.Bytes()
 	return nil
 }

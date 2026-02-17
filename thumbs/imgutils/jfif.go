@@ -7,14 +7,14 @@ import (
 
 // This is specific to go - when encoding jpeg standard encoder does not create JFIF APP0 segment and Kindle does not like it.
 
-// JpegDPIType specifyes type of the DPI units
-type JpegDPIType uint8
+// jpegDPIType specifies type of the DPI units.
+type jpegDPIType uint8
 
-// DPI units type values
+// DPI units type values.
 const (
-	DpiNoUnits JpegDPIType = iota
-	DpiPxPerInch
-	DpiPxPerCm
+	dpiNoUnits jpegDPIType = iota
+	dpiPxPerInch
+	dpiPxPerCm
 )
 
 var (
@@ -22,8 +22,8 @@ var (
 	jfif   = []byte{0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x02} // jfif + version
 )
 
-// SetJpegDPI creates JFIF APP0 with provided DPI if segment is missing in image.
-func SetJpegDPI(buf *bytes.Buffer, dpit JpegDPIType, xdensity, ydensity int16) (*bytes.Buffer, bool) {
+// setJpegDPI creates JFIF APP0 with provided DPI if segment is missing in image.
+func setJpegDPI(buf *bytes.Buffer, dpit jpegDPIType, xdensity, ydensity int16) (*bytes.Buffer, bool) {
 
 	data := buf.Bytes()
 
