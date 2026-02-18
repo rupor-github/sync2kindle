@@ -148,11 +148,7 @@ func (s ObjectInfoSet) Intersect(other ObjectInfoSet) ObjectInfoSet {
 // Union returns a new ObjectInfoSet that contains all the elements that are present in either s or other.
 func (s ObjectInfoSet) Union(other ObjectInfoSet) ObjectInfoSet {
 	nos := make(ObjectInfoSet)
-	for k, v := range s {
-		nos[k] = v
-	}
-	for k, v := range other {
-		nos[k] = v
-	}
+	maps.Copy(nos, s)
+	maps.Copy(nos, other)
 	return nos
 }

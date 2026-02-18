@@ -15,7 +15,7 @@ func (s SecretString) MarshalJSON() ([]byte, error) {
 }
 
 // MarshalYAML marshals SecretString to YAML making sure that actual value is not visible.
-func (s SecretString) MarshalYAML() (interface{}, error) {
+func (s SecretString) MarshalYAML() (any, error) {
 	if len(s) == 0 {
 		return nil, nil
 	}

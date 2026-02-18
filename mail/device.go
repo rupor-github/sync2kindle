@@ -80,11 +80,12 @@ func encodeParts(realname string) []string {
 }
 
 func encodeContentDispositionFilename(safename, realname string) string {
-	res := `filename="` + safename + `"`
+	var res strings.Builder
+	res.WriteString(`filename="` + safename + `"`)
 	for i, name := range encodeParts(realname) {
-		res += fmt.Sprintf("; filename*%d*=%s", i, name)
+		res.WriteString(fmt.Sprintf("; filename*%d*=%s", i, name))
 	}
-	return res
+	return res.String()
 }
 
 func (d *Device) Copy(obj *objects.ObjectInfo) (err error) {
