@@ -897,7 +897,7 @@ func getFullPathAt(infos []*objects.ObjectInfo, at int) string {
 		return ""
 	}
 
-	fullPath := path.Join(infos[at].Name)
+	fullPath := infos[at].Name
 	for {
 		found := slices.IndexFunc(infos, func(o *objects.ObjectInfo) bool {
 			return slices.Equal(o.Oid, infos[at].OidParent)
