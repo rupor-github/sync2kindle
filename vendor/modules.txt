@@ -80,10 +80,10 @@ go.uber.org/zap/zaptest
 # golang.org/x/crypto v0.48.0
 ## explicit; go 1.24.0
 golang.org/x/crypto/sha3
-# golang.org/x/exp v0.0.0-20260212183809-81e46e3db34a
+# golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 ## explicit; go 1.25.0
 golang.org/x/exp/constraints
-# golang.org/x/exp/typeparams v0.0.0-20260212183809-81e46e3db34a
+# golang.org/x/exp/typeparams v0.0.0-20260218203240-3dfff04db8fa
 ## explicit; go 1.25.0
 golang.org/x/exp/typeparams
 # golang.org/x/image v0.36.0
@@ -355,6 +355,10 @@ honnef.co/go/tools/stylecheck/st1021
 honnef.co/go/tools/stylecheck/st1022
 honnef.co/go/tools/stylecheck/st1023
 honnef.co/go/tools/unused
+# modernc.org/ccgo/v4 v4.31.0
+## explicit; go 1.24.0
+# modernc.org/fileutil v1.4.0
+## explicit; go 1.24
 # modernc.org/libc v1.68.0
 ## explicit; go 1.24.0
 modernc.org/libc
@@ -389,7 +393,7 @@ modernc.org/mathutil
 # modernc.org/memory v1.11.0
 ## explicit; go 1.23.0
 modernc.org/memory
-# modernc.org/sqlite v1.46.0
+# modernc.org/sqlite v1.46.1
 ## explicit; go 1.24.0
 modernc.org/sqlite/lib
 # zombiezen.com/go/sqlite v1.4.2
