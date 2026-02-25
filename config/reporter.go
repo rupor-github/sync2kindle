@@ -3,12 +3,15 @@ package config
 import (
 	"archive/zip"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"time"
+
+	"s2k/misc"
 )
 
 type ReporterConfig struct {
@@ -22,7 +25,7 @@ func (conf *ReporterConfig) Prepare() (*Report, error) {
 
 	if f, err := os.Create(conf.Destination); err == nil {
 		r.file = f
-	} else if f, err = os.CreateTemp("", "sync2kindle-report.*.zip"); err == nil {
+	} else if f, err = os.CreateTemp("", misc.GetAppName()+"-report.*.zip"); err == nil {
 		r.file = f
 	} else {
 		return nil, fmt.Errorf("unable to create report: %w", err)
@@ -33,6 +36,7 @@ func (conf *ReporterConfig) Prepare() (*Report, error) {
 type entry struct {
 	original string
 	actual   string
+	tempDir  string // temp dir holding the copied file/dir; may differ from actual for regular files
 	stamp    time.Time
 	data     []byte
 }
@@ -41,13 +45,12 @@ type entry struct {
 // NOTE: presently not to be used concurrently!
 type Report struct {
 	// entries is a map of names to entries of files or directories to be put in the final archive later.
-	entries  map[string]entry
-	file     *os.File
-	tempDirs []string // temp dirs created by StoreCopy, cleaned up in Close()
+	entries map[string]entry
+	file    *os.File
 }
 
-// Close finalizes debug report.
-func (r *Report) Close() error {
+// Close finalizes debug report and removes stored working directories.
+func (r *Report) Close() (retErr error) {
 	if r == nil {
 		// Ignore uninitialized cases to avoid checking in many places. This means no report has been requested.
 		return nil
@@ -55,13 +58,30 @@ func (r *Report) Close() error {
 	if r.file == nil {
 		return nil
 	}
+	defer r.removeStoredDirs()
 	defer func() {
-		r.file.Close()
-		for _, dir := range r.tempDirs {
-			os.RemoveAll(dir)
-		}
+		retErr = errors.Join(retErr, r.file.Close())
 	}()
 	return r.finalize()
+}
+
+// removeStoredDirs removes all temporary directories created by StoreCopy
+// after they have been archived by finalize().
+func (r *Report) removeStoredDirs() {
+	for _, e := range r.entries {
+		if len(e.data) > 0 || len(e.actual) == 0 {
+			continue
+		}
+		// For regular files, tempDir holds the parent temp directory.
+		// For directories, actual is the temp directory itself.
+		dir := e.tempDir
+		if dir == "" {
+			dir = e.actual
+		}
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			os.RemoveAll(dir)
+		}
+	}
 }
 
 // Name returns name of underlying file.
@@ -147,23 +167,26 @@ func (r *Report) StoreCopy(name, path string) error {
 	if err != nil {
 		return err
 	}
-	r.tempDirs = append(r.tempDirs, dir)
 
 	if info, err := os.Stat(e.actual); err == nil {
 		switch {
 		case info.Mode().IsRegular():
 			where, err := copyFile(dir, e.actual, info.ModTime())
 			if err != nil {
+				os.RemoveAll(dir)
 				return err
 			}
 			e.actual = where
+			e.tempDir = dir
 		case info.Mode().IsDir():
 			if err := copyDir(dir, e.actual); err != nil {
+				os.RemoveAll(dir)
 				return err
 			}
 			e.actual = dir
 		}
 	} else {
+		os.RemoveAll(dir)
 		return err
 	}
 
@@ -197,6 +220,7 @@ func copyFile(dir, src string, modTime time.Time) (string, error) {
 	if err = out.Sync(); err != nil {
 		return "", err
 	}
+	out.Close()
 
 	if err := os.Chtimes(dst, modTime, modTime); err != nil {
 		return "", err
@@ -231,49 +255,101 @@ func copyDir(dir, src string) error {
 }
 
 // finalize creates the final archive (report) with all previously stored items.
-func (r *Report) finalize() error {
+func (r *Report) finalize() (retErr error) {
 
 	arc := zip.NewWriter(r.file)
-	defer arc.Close()
+	defer func() {
+		retErr = errors.Join(retErr, arc.Close())
+	}()
 
 	t := time.Now()
 
-	names, manifest := prepareManifest(r.entries)
+	// Expand all entries so that directories are replaced by their individual files.
+	// This ensures the MANIFEST contains every file that will be in the archive.
+	expanded := expandEntries(r.entries, t)
+
+	names, manifest := prepareManifest(expanded)
 	if err := saveFile(arc, "MANIFEST", t, manifest); err != nil {
 		return err
 	}
 
 	// in the same order as in manifest
 	for _, name := range names {
-		if len(r.entries[name].data) > 0 {
-			if err := saveFile(arc, name, r.entries[name].stamp, bytes.NewReader(r.entries[name].data)); err != nil {
+		e := expanded[name]
+		if len(e.data) > 0 {
+			if err := saveFile(arc, name, e.stamp, bytes.NewReader(e.data)); err != nil {
 				return err
 			}
 			continue
 		}
 
-		path := r.entries[name].actual
-		// ignoring absent files
-		if info, err := os.Stat(path); err == nil {
-			switch {
-			case info.Mode().IsRegular():
-				var r io.ReadCloser
-				if r, err = os.Open(path); err != nil {
-					return err
-				}
-				if err := saveFile(arc, name, info.ModTime(), r); err != nil {
-					r.Close()
-					return err
-				}
-				r.Close()
-			case info.Mode().IsDir():
-				if err := saveDir(arc, name, path); err != nil {
-					return err
-				}
+		path := e.actual
+		if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
+			var f io.ReadCloser
+			if f, err = os.Open(path); err != nil {
+				return err
 			}
+			if err := saveFile(arc, name, info.ModTime(), f); err != nil {
+				f.Close()
+				return err
+			}
+			f.Close()
 		}
 	}
 	return nil
+}
+
+// expandEntries returns a new map where directory entries have been replaced
+// by individual file entries for every regular file inside the directory tree.
+// Non-directory entries (data or regular files) are passed through unchanged.
+// Absent paths are silently skipped.
+func expandEntries(entries map[string]entry, now time.Time) map[string]entry {
+	expanded := make(map[string]entry, len(entries))
+
+	for name, e := range entries {
+		if len(e.data) > 0 {
+			expanded[name] = e
+			continue
+		}
+
+		info, err := os.Stat(e.actual)
+		if err != nil {
+			// absent path — still list it in the manifest so the user knows it was expected
+			if e.stamp.IsZero() {
+				e.stamp = now
+			}
+			expanded[name] = e
+			continue
+		}
+
+		if info.Mode().IsRegular() {
+			expanded[name] = e
+			continue
+		}
+
+		if info.IsDir() {
+			_ = filepath.Walk(e.actual, func(path string, fi os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				if !fi.Mode().IsRegular() {
+					return nil
+				}
+				rel, err := filepath.Rel(e.actual, path)
+				if err != nil {
+					return err
+				}
+				childName := filepath.ToSlash(filepath.Join(name, rel))
+				expanded[childName] = entry{
+					original: filepath.Join(e.original, rel),
+					actual:   path,
+					stamp:    fi.ModTime(),
+				}
+				return nil
+			})
+		}
+	}
+	return expanded
 }
 
 func prepareManifest(entries map[string]entry) ([]string, *bytes.Buffer) {
@@ -310,35 +386,4 @@ func saveFile(dst *zip.Writer, name string, t time.Time, src io.Reader) error {
 		return err
 	}
 	return nil
-}
-
-func saveDir(dst *zip.Writer, name, dir string) error {
-	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.Mode().IsRegular() {
-			// ignore links, sockets, etc.
-			return nil
-		}
-
-		// Get the path of the file relative to the source folder
-		rel, err := filepath.Rel(dir, path)
-		if err != nil {
-			return err
-		}
-		// root entry under new name
-		rel = filepath.ToSlash(filepath.Join(name, rel))
-
-		var r io.ReadCloser
-		if r, err = os.Open(path); err != nil {
-			return err
-		}
-		defer r.Close()
-
-		if err = saveFile(dst, rel, info.ModTime(), r); err != nil {
-			return err
-		}
-		return nil
-	})
 }
