@@ -151,11 +151,63 @@ Proper configuration is expected for succesful operation, including working smtp
 			},
 			{
 				Name:   "history",
-				Usage:  "Lists details for local history files",
+				Usage:  "Reports on local history databases",
 				Before: beforeCmdRun,
 				Action: history.RunList,
+				Commands: []*cli.Command{
+					{
+						Name:   "list",
+						Usage:  "Lists basic details for each history database",
+						Action: history.RunList,
+					},
+					{
+						Name:  "steps",
+						Usage: "Lists all sync steps with timestamps and object counts",
+						Flags: []cli.Flag{
+							&cli.StringFlag{Name: "db", Usage: "filter by database ID prefix"},
+						},
+						Action: history.RunSteps,
+					},
+					{
+						Name:  "objects",
+						Usage: "Lists all objects in the latest (or specified) step",
+						Flags: []cli.Flag{
+							&cli.StringFlag{Name: "db", Usage: "filter by database ID prefix"},
+							&cli.Int64Flag{Name: "step", Aliases: []string{"s"}, Usage: "step number to inspect (default: latest)"},
+						},
+						Action: history.RunObjects,
+					},
+					{
+						Name:  "diff",
+						Usage: "Shows changes between two steps (defaults to last two)",
+						Flags: []cli.Flag{
+							&cli.StringFlag{Name: "db", Usage: "filter by database ID prefix"},
+							&cli.Int64Flag{Name: "from", Usage: "starting step number"},
+							&cli.Int64Flag{Name: "to", Usage: "ending step number"},
+						},
+						Action: history.RunDiff,
+					},
+					{
+						Name:  "stats",
+						Usage: "Shows aggregate statistics for the latest (or specified) step",
+						Flags: []cli.Flag{
+							&cli.StringFlag{Name: "db", Usage: "filter by database ID prefix"},
+							&cli.Int64Flag{Name: "step", Aliases: []string{"s"}, Usage: "step number to inspect (default: latest)"},
+						},
+						Action: history.RunStats,
+					},
+					{
+						Name:  "orphans",
+						Usage: "Finds history databases that may be stale or no longer needed",
+						Flags: []cli.Flag{
+							&cli.StringFlag{Name: "db", Usage: "filter by database ID prefix"},
+						},
+						Action: history.RunOrphans,
+					},
+				},
 				CustomHelpTemplate: fmt.Sprintf(`%s
 Lists local history databases specifying details for each of them.
+Use subcommands for more detailed reports.
 `, cli.CommandHelpTemplate),
 			},
 			{

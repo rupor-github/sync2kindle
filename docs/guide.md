@@ -7,6 +7,7 @@
 - [Quick Start](#quick-start)
 - [Basic Usage](#basic-usage)
 - [Synchronization Algorithm](#synchronization-algorithm)
+- [History](#history)
 - [Configuration](#configuration)
 - [E-mail Delivery](#e-mail-delivery)
 - [Thumbnails and Supplemental Artifacts](#thumbnails-and-supplemental-artifacts)
@@ -172,13 +173,93 @@ s2k mail [options]
 
 #### history
 
-Lists details for local history database files.
+Reports on local history databases. When invoked without a subcommand, lists basic details for each database.
 
 ```
 s2k history
+s2k history <subcommand> [options]
 ```
 
-Displays information about all history databases, showing which devices and target directories have been synchronized.
+Each history database is identified by a short hex ID (the first 8 characters of the SHA256 filename). Use `history list` to discover these IDs, then pass them to other subcommands with the `--db` flag to narrow the scope to a single database.
+
+##### history list
+
+Lists basic details for each history database: short ID, path, last step number, and identifiers (device, target, protocol).
+
+```bash
+s2k history list
+```
+
+##### history steps
+
+Lists all sync steps with timestamps, source/destination paths, and object counts.
+
+```bash
+s2k history steps
+s2k history steps --db a1b2c3d4
+```
+
+**Options:**
+
+- `--db ID` - Filter by database ID prefix (any length)
+
+##### history objects
+
+Lists all objects in the latest (or specified) sync step, showing path, size, modification time, and content hash.
+
+```bash
+s2k history objects
+s2k history objects --db a1b2c3d4 --step 3
+```
+
+**Options:**
+
+- `--db ID` - Filter by database ID prefix (any length)
+- `--step N, -s N` - Step number to inspect (default: latest)
+
+##### history diff
+
+Shows changes (added, removed, changed files) between two sync steps. Defaults to comparing the last two steps.
+
+```bash
+s2k history diff
+s2k history diff --db a1b2c3d4 --from 2 --to 5
+```
+
+**Options:**
+
+- `--db ID` - Filter by database ID prefix (any length)
+- `--from N` - Starting step number
+- `--to N` - Ending step number
+
+If neither `--from` nor `--to` is specified, the last two steps are compared. If only `--to` is given, it is compared against its predecessor. If only `--from` is given, it is compared against the latest step.
+
+##### history stats
+
+Shows aggregate statistics for the latest (or specified) step: file and directory counts, total size, date range, breakdown by file extension, and thumbnail counts.
+
+```bash
+s2k history stats
+s2k history stats --db a1b2c3d4 --step 3
+```
+
+**Options:**
+
+- `--db ID` - Filter by database ID prefix (any length)
+- `--step N, -s N` - Step number to inspect (default: latest)
+
+##### history orphans
+
+Identifies history databases that may be stale or no longer needed. A database is flagged as possibly orphaned when the last sync source directory no longer exists or the last sync was more than 180 days ago.
+
+```bash
+s2k history orphans
+s2k history orphans --db a1b2c3d4
+```
+
+**Options:**
+
+- `--db ID` - Filter by database ID prefix (any length)
 
 #### dumpconfig
 
@@ -272,6 +353,22 @@ This design allows you to:
 - Sync the same local directory to multiple devices
 - Sync different target directories on the same device at different intervals
 - Maintain independent histories that don't interfere with each other
+
+## History
+
+The `history` command and its subcommands allow you to inspect and diagnose the sync history databases without performing any sync operations.
+
+### Database Identification
+
+Each history database file is named after a SHA256 hash derived from the device identifier, target path, and protocol. Since these names are not human-friendly, the `list` subcommand shows a short 8-character hex prefix for each database. You can use any prefix of any length with the `--db` flag to select a specific database (similar to how git allows abbreviated commit hashes).
+
+### Typical Workflow
+
+1. Run `s2k history list` to see all databases and their short IDs
+2. Use `s2k history steps --db <id>` to see the sync timeline for a database
+3. Use `s2k history diff --db <id>` to see what changed in the last sync
+4. Use `s2k history stats --db <id>` to get a summary of stored content
+5. Use `s2k history orphans` to find databases that may no longer be needed
 
 ## Configuration
 
