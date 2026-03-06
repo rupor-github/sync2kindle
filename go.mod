@@ -1,6 +1,6 @@
 module s2k
 
-go 1.26.0
+go 1.26.1
 
 tool honnef.co/go/tools/cmd/staticcheck
 
@@ -11,7 +11,7 @@ require (
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/gosimple/slug v1.15.0
 	github.com/rupor-github/gencfg v1.0.14
-	github.com/urfave/cli/v3 v3.6.2
+	github.com/urfave/cli/v3 v3.7.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/sys v0.41.0
 	golang.org/x/term v0.40.0
@@ -20,10 +20,7 @@ require (
 	zombiezen.com/go/sqlite v1.4.2
 )
 
-require (
-	modernc.org/ccgo/v4 v4.31.0 // indirect
-	modernc.org/fileutil v1.4.0 // indirect
-)
+require modernc.org/ccgo/v4 v4.32.0 // indirect
 
 require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
@@ -39,7 +36,6 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
-	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa // indirect
 	golang.org/x/exp/typeparams v0.0.0-20260218203240-3dfff04db8fa // indirect
 	golang.org/x/image v0.36.0
 	golang.org/x/mod v0.33.0 // indirect
@@ -48,7 +44,7 @@ require (
 	golang.org/x/tools v0.42.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	honnef.co/go/tools v0.7.0 // indirect
-	modernc.org/libc v1.68.0 // indirect
+	modernc.org/libc v1.69.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.46.1 // indirect
