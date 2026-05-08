@@ -102,7 +102,7 @@ func (r *Reader) extractThumbnail(data []byte) error {
 		return fmt.Errorf("unable to read KF8 offset: %w", err)
 	}
 	if len(kf8off) > 0 {
-		// only pay attention to first KF8 offfset - there should only be one
+		// only pay attention to first KF8 offset - there should only be one
 		if kf8, err = getInt32(kf8off[0], 0); err == nil && kf8 >= 0 {
 			kfrec0, err = readSection(data, kf8)
 			if err != nil {
