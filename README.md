@@ -79,4 +79,3 @@ incorporate your changes.
 ### TODO
 
 - Support additional platforms
-- Expand history reports with some useful statistics
