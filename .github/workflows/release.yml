@@ -43,3 +43,4 @@ jobs:
           generate_release_notes: true
           files: |-
             release/s2k-*.zip
+            release/s2km-*.zip
