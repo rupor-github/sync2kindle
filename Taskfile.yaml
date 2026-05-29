@@ -12,10 +12,11 @@ vars:
   PRJ_NAME: 's2k'
   DEV_BUILD_DIR: 'build'
   REL_BUILD_DIR: 'release'
+  ALL_BUILD_TAGS: 'mtp usb'
 
   REF_VER: '{{regexFind "refs/tags/v[0-9]+\\.[0-9]+\\.?[0-9]*[-a-zA-Z0-9+]*" (env "GITHUB_REF")}}'
 
-  TARGET_RELEASES: [linux-amd64, windows-amd64-.exe]
+  TARGET_RELEASES: [linux-amd64, linux-arm64, linux-386, darwin-amd64, darwin-arm64, freebsd-amd64, freebsd-arm64, windows-amd64-.exe, windows-arm64-.exe, windows-386-.exe]
 
   TATN: {sh: '{{if (env "TERM")}}tput setaf 4{{end}}'}
   TOFF: {sh: '{{if (env "TERM")}}tput sgr0{{end}}'}
@@ -35,11 +36,23 @@ tasks:
       - task: generate-project-version
     cmds:
       - task: go-build
-        vars: {FLAGS: 'debug', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.DEV_BUILD_DIR}}/{{.PRJ_NAME}}'}
+        vars: {GOOS: 'linux', GOARCH: 'amd64', CGO_ENABLED: '1', FLAGS: 'debug', TAGS: '{{.ALL_BUILD_TAGS}}', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.DEV_BUILD_DIR}}/{{.PRJ_NAME}}'}
       - task: compile-all-tests
       - task: lint
 
-  devwin:
+  debug-min:
+    desc: Builds minimal development version for host OS
+    platforms: [linux]
+    deps:
+      - task: pre-commit-install
+      - task: generate-project-version
+    cmds:
+      - task: go-build
+        vars: {GOOS: 'linux', GOARCH: 'amd64', CGO_ENABLED: '0', FLAGS: 'debug', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.DEV_BUILD_DIR}}/{{.PRJ_NAME}}m'}
+      - task: compile-all-tests
+      - task: lint
+
+  debug-win:
     desc: Builds development version for windows (cross-compiling on host os)
     aliases: [dw]
     platforms: [linux]
@@ -48,7 +61,7 @@ tasks:
       - task: generate-project-version
     cmds:
       - task: go-build
-        vars: {GOOS: 'windows', GOARCH: 'amd64', FLAGS: 'debug', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.DEV_BUILD_DIR}}/{{.PRJ_NAME}}.exe'}
+        vars: {GOOS: 'windows', GOARCH: 'amd64', CGO_ENABLED: '0', FLAGS: 'debug', TAGS: '{{.ALL_BUILD_TAGS}}', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.DEV_BUILD_DIR}}/{{.PRJ_NAME}}.exe'}
       - task: compile-all-tests
       - task: lint
 
@@ -116,47 +129,60 @@ tasks:
       - mkdir -p '{{.REL_BUILD_DIR}}'
       - for:
           var: TARGET_RELEASES
-        task: release-for-platform-{{with $arch := split "-" .ITEM}}{{$arch._0}}{{end}}
+        task: release-for-platform
         vars:
           GOOS: '{{with $arch := split "-" .ITEM}}{{$arch._0}}{{end}}'
           GOARCH: '{{with $arch := split "-" .ITEM}}{{$arch._1}}{{end}}'
           SUFFIX: '{{with $arch := split "-" .ITEM}}{{$arch._2}}{{end}}'
 
-  release-for-platform-windows:
+  release-for-platform:
     internal: true
-    desc: Builds release for specified platform
+    desc: Builds releases for specified platform
     requires:
       vars: [GOOS, GOARCH, SUFFIX]
-    label: release-for-platform-windows-{{.GOOS}}-{{.GOARCH}}
+    label: release-for-platform-{{.GOOS}}-{{.GOARCH}}
+    cmds:
+      - if: '{{or (and (eq .GOOS "linux") (eq .GOARCH "amd64")) (and (eq .GOOS "windows") (eq .GOARCH "amd64"))}}'
+        task: release-for-platform-full
+        vars: {GOOS: '{{.GOOS}}', GOARCH: '{{.GOARCH}}', SUFFIX: '{{.SUFFIX}}'}
+      - if: '{{not (and (eq .GOOS "windows") (eq .GOARCH "amd64"))}}'
+        task: release-for-platform-min
+        vars: {GOOS: '{{.GOOS}}', GOARCH: '{{.GOARCH}}', SUFFIX: '{{.SUFFIX}}'}
+
+  release-for-platform-full:
+    internal: true
+    desc: Builds full release for specified platform
+    requires:
+      vars: [GOOS, GOARCH, SUFFIX]
+    label: release-for-platform-full-{{.GOOS}}-{{.GOARCH}}
     vars:
       BUILD_DIR: '{{.REL_BUILD_DIR}}_{{.GOOS}}_{{.GOARCH}}'
       REL_NAME: '{{.REL_BUILD_DIR}}/{{.PRJ_NAME}}-{{.GOOS}}-{{.GOARCH}}'
-    env:
-      CGO_ENABLED: '0'
+      CGO: '{{if eq .GOOS "linux"}}1{{else}}0{{end}}'
     cmds:
       - mkdir -p {{.BUILD_DIR}}
       - defer: rm -rf {{.BUILD_DIR}}
       - task: go-build
-        vars: {GOOS: '{{.GOOS}}', GOARCH: '{{.GOARCH}}', FLAGS: 'release', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.BUILD_DIR}}/{{.PRJ_NAME}}{{.SUFFIX}}'}
+        vars: {GOOS: '{{.GOOS}}', GOARCH: '{{.GOARCH}}', CGO_ENABLED: '{{.CGO}}', FLAGS: 'release', TAGS: '{{.ALL_BUILD_TAGS}}', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.BUILD_DIR}}/{{.PRJ_NAME}}{{.SUFFIX}}'}
       - echo "{{.TATN}}Archiving release \"{{.REL_NAME}}.zip\"{{.TOFF}}"
       - 7z a -r -bd -bso0 -tzip {{.REL_NAME}} ./{{.BUILD_DIR}}/*
     status:
       - test -f '{{.REL_NAME}}.zip'
 
-  release-for-platform-linux:
+  release-for-platform-min:
     internal: true
-    desc: Builds release for specified platform
+    desc: Builds minimal release for specified platform
     requires:
       vars: [GOOS, GOARCH, SUFFIX]
-    label: release-for-platform-linux-{{.GOOS}}-{{.GOARCH}}
+    label: release-for-platform-min-{{.GOOS}}-{{.GOARCH}}
     vars:
-      BUILD_DIR: '{{.REL_BUILD_DIR}}_{{.GOOS}}_{{.GOARCH}}'
-      REL_NAME: '{{.REL_BUILD_DIR}}/{{.PRJ_NAME}}-{{.GOOS}}-{{.GOARCH}}'
+      BUILD_DIR: '{{.REL_BUILD_DIR}}_{{.GOOS}}_{{.GOARCH}}_min'
+      REL_NAME: '{{.REL_BUILD_DIR}}/{{.PRJ_NAME}}m-{{.GOOS}}-{{.GOARCH}}'
     cmds:
       - mkdir -p {{.BUILD_DIR}}
       - defer: rm -rf {{.BUILD_DIR}}
       - task: go-build
-        vars: {GOOS: '{{.GOOS}}', GOARCH: '{{.GOARCH}}', FLAGS: 'release', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.BUILD_DIR}}/{{.PRJ_NAME}}'}
+        vars: {GOOS: '{{.GOOS}}', GOARCH: '{{.GOARCH}}', CGO_ENABLED: '0', FLAGS: 'release', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.BUILD_DIR}}/{{.PRJ_NAME}}m{{.SUFFIX}}'}
       - echo "{{.TATN}}Archiving release \"{{.REL_NAME}}.zip\"{{.TOFF}}"
       - 7z a -r -bd -bso0 -tzip {{.REL_NAME}} ./{{.BUILD_DIR}}/*
     status:
@@ -201,7 +227,7 @@ tasks:
       DIRS_WITH_TESTS:
         sh: find -name '*_test.go' -printf "%h\n" | sort -u
     cmds:
-      - echo "{{.TATN}}Check compiling all availble tests{{.TOFF}}"
+      - echo "{{.TATN}}Check compiling all available tests{{.TOFF}}"
       - for: {var: DIRS_WITH_TESTS, as: DIR}
         cmd: go test -mod=mod -c -o /dev/null '{{.DIR}}'
     sources:
@@ -213,8 +239,8 @@ tasks:
     desc: Builds binary using go toolchain
     requires:
       vars: [PACKAGE, TARGET, FLAGS]
-    label: go-build-{{.PACKAGE}}-{{.TARGET}}-{{.FLAGS}}-{{.GOOS}}-{{.GOARCH}}
-    env: {GOOS: '{{default "linux" .GOOS}}', GOARCH: '{{default "amd64" .GOARCH}}'}
+    label: go-build-{{.PACKAGE}}-{{.TARGET}}-{{.FLAGS}}-{{.GOOS}}-{{.GOARCH}}-{{.CGO_ENABLED}}-{{.TAGS}}
+    env: {GOOS: '{{default "linux" .GOOS}}', GOARCH: '{{default "amd64" .GOARCH}}', CGO_ENABLED: '{{default (env "CGO_ENABLED") .CGO_ENABLED}}'}
     # in case you need completely unoptimized build: -gcflags 'all=-N -l'
     vars:
       GOARGS: |
@@ -225,8 +251,9 @@ tasks:
         {{- else -}}
         {{fail "go build flags could be \"debug\" or \"release\" only!"}}
         {{- end -}}
+        {{- if .TAGS }} -tags '{{.TAGS}}'{{ end -}}
     cmds:
-      - echo "{{.TATN}}Building \"{{base .TARGET}}\" binary for \"$GOOS:$GOARCH\" from \"{{.PACKAGE}}\"{{.TOFF}}"
+      - echo "{{.TATN}}Building \"{{base .TARGET}}\" binary for \"$GOOS:$GOARCH\"{{if .CGO_ENABLED}} with CGO_ENABLED={{.CGO_ENABLED}}{{end}}{{if .TAGS}} with tags \"{{.TAGS}}\"{{end}} from \"{{.PACKAGE}}\"{{.TOFF}}"
       - go build {{.GOARGS}} -o '{{.TARGET}}' '{{.PACKAGE}}'
     sources:
       - ./**/*.go
@@ -300,7 +327,7 @@ tasks:
       - for:
           var: TARGET_RELEASES
         cmd: |
-          echo "Tidying with {{with $arch := split "-" .ITEM}}{{$arch._0}}{{end}} GOARCH={{with $arch := split "-" .ITEM}}{{$arch._1}}{{end}}"
+          echo "Tidying with GOOS={{with $arch := split "-" .ITEM}}{{$arch._0}}{{end}} GOARCH={{with $arch := split "-" .ITEM}}{{$arch._1}}{{end}}"
           GOOS={{with $arch := split "-" .ITEM}}{{$arch._0}}{{end}} GOARCH={{with $arch := split "-" .ITEM}}{{$arch._1}}{{end}} go mod tidy -go={{.GO_VERSION}} {{.CLI_ARGS}}
 
   go-vendor:
@@ -311,7 +338,7 @@ tasks:
       - for:
           var: TARGET_RELEASES
         cmd: |
-          echo "Vendoring with {{with $arch := split "-" .ITEM}}{{$arch._0}}{{end}} GOARCH={{with $arch := split "-" .ITEM}}{{$arch._1}}{{end}}"
+          echo "Vendoring with GOOS={{with $arch := split "-" .ITEM}}{{$arch._0}}{{end}} GOARCH={{with $arch := split "-" .ITEM}}{{$arch._1}}{{end}}"
           GOOS={{with $arch := split "-" .ITEM}}{{$arch._0}}{{end}} GOARCH={{with $arch := split "-" .ITEM}}{{$arch._1}}{{end}} go mod vendor {{.CLI_ARGS}}
 
   clean:
@@ -340,4 +367,3 @@ tasks:
     status:
       - test -f '{{.ROOT_DIR}}/.git/hooks/pre-commit'
       - test -f '{{.ROOT_DIR}}/.git/hooks/pre-push'
-

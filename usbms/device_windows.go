@@ -1,3 +1,5 @@
+//go:build usb && windows
+
 package usbms
 
 import (

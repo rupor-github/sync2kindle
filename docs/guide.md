@@ -57,8 +57,15 @@ Amazon's Send-to-Kindle service accepts: `.doc`, `.docx`, `.html`, `.htm`, `.rtf
 ## Installation
 
 1. Download the latest release from the [releases page](https://github.com/rupor-github/sync2kindle/releases)
-2. Unpack the archive to a convenient location
-3. The main executable is `s2k` (or `s2k.exe` on Windows)
+2. Choose the archive for your platform and required functionality
+3. Unpack the archive to a convenient location
+
+Release archives are named after the binary they contain:
+
+- `s2k-*` archives contain the full build with `mtp`, `usb`, `mail`, `history`, and `dumpconfig` commands.
+- `s2km-*` archives contain the minimal build with only `mail`, `history`, and `dumpconfig` commands.
+
+Use `s2k` when direct USB/MTP device synchronization is needed. Use `s2km` when you only need e-mail delivery or want a portable no-CGO build for a platform where USB/MTP drivers are not available in this project.
 
 You can verify the release authenticity using [minisign](https://github.com/jedisct1/minisign) with the public key:
 
@@ -70,6 +77,7 @@ RWTNh1aN8DrXq26YRmWO3bPBx4m8jBATGXt4Z96DF4OVSzdCBmoAU+Vq
 
 - **Windows x64** - No additional dependencies required (uses COM/WPD for MTP)
 - **Linux x64** - Requires `libmtp` installed on the system (uses CGO)
+- **Minimal builds** - Do not require CGO or `libmtp`, but do not include `mtp` or `usb` commands
 
 ## Quick Start
 
@@ -125,6 +133,8 @@ s2k [global options] command [command options]
 - `--help, -h` - Show help
 
 ### Commands
+
+The full `s2k` binary includes all commands below. The minimal `s2km` binary includes only `mail`, `history`, and `dumpconfig`.
 
 #### mtp
 

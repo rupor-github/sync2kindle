@@ -17,24 +17,16 @@ import (
 	"s2k/files"
 	"s2k/history"
 	"s2k/mail"
-	"s2k/mtp"
 	"s2k/state"
-	"s2k/usbms"
 )
 
-func RunUSB(ctx context.Context, cmd *cli.Command) error {
-	return sync(ctx, cmd, common.ProtocolUSB)
-}
-
-func RunMTP(ctx context.Context, cmd *cli.Command) error {
-	return sync(ctx, cmd, common.ProtocolMTP)
-}
+type connectFunc func(cmd *cli.Command, env *state.LocalEnv) (driver, error)
 
 func RunMail(ctx context.Context, cmd *cli.Command) error {
-	return sync(ctx, cmd, common.ProtocolMail)
+	return run(ctx, cmd, common.ProtocolMail, connectMail)
 }
 
-func sync(ctx context.Context, cmd *cli.Command, protocol common.SupportedProtocols) error {
+func run(ctx context.Context, cmd *cli.Command, protocol common.SupportedProtocols, connect connectFunc) error {
 	env := ctx.Value(state.EnvValue).(*state.LocalEnv)
 	log := env.Log.Named("sync")
 
@@ -94,7 +86,7 @@ func sync(ctx context.Context, cmd *cli.Command, protocol common.SupportedProtoc
 
 	// Target: device
 
-	dev, err := connectDevice(cmd, protocol, env)
+	dev, err := connect(cmd, env)
 	if err != nil {
 		return fmt.Errorf("unable to connect to device: %w", err)
 	}
@@ -166,28 +158,15 @@ func sync(ctx context.Context, cmd *cli.Command, protocol common.SupportedProtoc
 	return nil
 }
 
-func connectDevice(cmd *cli.Command, protocol common.SupportedProtocols, env *state.LocalEnv) (driver, error) {
-	switch protocol {
-	case common.ProtocolUSB:
-		return usbms.Connect(
-			strings.Join([]string{env.Cfg.TargetPath, common.ThumbnailFolder}, string(filepath.ListSeparator)),
-			env.Cfg.DeviceSerial, cmd.Bool("unmount") && !cmd.Bool("dry-run"), env.Log.Named("sync"))
-	case common.ProtocolMTP:
-		return mtp.Connect(
-			strings.Join([]string{env.Cfg.TargetPath, common.ThumbnailFolder}, string(filepath.ListSeparator)),
-			env.Cfg.DeviceSerial, cmd.Bool("debug"), env.Log.Named("sync"))
-	case common.ProtocolMail:
-		debug := cmd.Bool("debug")
-		if debug {
-			mailDir, err := os.MkdirTemp("", "s2k-m-")
-			if err != nil {
-				return nil, fmt.Errorf("unable to create temporary directory: %w", err)
-			}
-			env.Cfg.Smtp.Dir = mailDir
-			env.Rpt.Store("mails", mailDir)
+func connectMail(cmd *cli.Command, env *state.LocalEnv) (driver, error) {
+	debug := cmd.Bool("debug")
+	if debug {
+		mailDir, err := os.MkdirTemp("", "s2k-m-")
+		if err != nil {
+			return nil, fmt.Errorf("unable to create temporary directory: %w", err)
 		}
-		return mail.Connect(env.Cfg.TargetPath, &env.Cfg.Smtp, debug, env.Log.Named("sync"))
-	default:
-		return nil, fmt.Errorf("unsupported protocol requested for sync: %s", protocol)
+		env.Cfg.Smtp.Dir = mailDir
+		env.Rpt.Store("mails", mailDir)
 	}
+	return mail.Connect(env.Cfg.TargetPath, &env.Cfg.Smtp, debug, env.Log.Named("sync"))
 }

@@ -1,3 +1,5 @@
+//go:build mtp && windows
+
 package mtp
 
 import (

@@ -1,3 +1,5 @@
+//go:build mtp && linux
+
 package mtp
 
 // #cgo pkg-config: libmtp

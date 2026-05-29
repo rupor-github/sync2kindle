@@ -1,3 +1,5 @@
+//go:build usb && linux
+
 package usbms
 
 import (

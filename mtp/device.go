@@ -1,3 +1,5 @@
+//go:build mtp
+
 package mtp
 
 import (

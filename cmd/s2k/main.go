@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	cli "github.com/urfave/cli/v3"
@@ -77,10 +78,12 @@ func main() {
 
 	env := state.NewLocalEnv()
 	ctx := context.WithValue(context.Background(), state.EnvValue, env)
+	commands := appendMTPCommand(nil)
+	commands = appendUSBCommand(commands)
 
 	app := &cli.Command{
-		Name:            "s2k",
-		Usage:           "synchronizing local books with supported kindle device over MTP protocol, USBMS mount or using e-mail",
+		Name:            appName(),
+		Usage:           "synchronizing local books with supported kindle device",
 		Version:         misc.GetVersion() + " (" + runtime.Version() + ") : " + misc.GetGitHash(),
 		HideHelpCommand: true,
 		Before:          beforeAppRun,
@@ -89,50 +92,8 @@ func main() {
 			&cli.StringFlag{Name: "config", Aliases: []string{"c"}, DefaultText: "", Usage: "load configuration from `FILE` (YAML)"},
 			&cli.BoolFlag{Name: "debug", Aliases: []string{"d"}, Usage: "changes program behavior to help troubleshooting"},
 		},
-		Commands: []*cli.Command{
-			{
-				Name:   "mtp",
-				Usage:  "Synchronizes books between local source and target device over MTP protocol",
-				Before: beforeCmdRun,
-				Flags: []cli.Flag{
-					&cli.BoolFlag{Name: "ignore-device-removals", Aliases: []string{"i"}, Usage: "do not respect books removals on the device"},
-					&cli.BoolFlag{Name: "dry-run", Usage: "do not perform any actual changes"},
-				},
-				Action: sync.RunMTP,
-				CustomHelpTemplate: fmt.Sprintf(`%s
-Using MTP protocol syncronizes books between 'source' local directory and 'target' path on the device.
-Both could be specified in configuration file, otherwise 'source' is current working directory and 'target' is "documents/mybooks".
-Kindle device is expected to be connected at the time of operation.
-
-When 'ignore-device-removals' flag is set, books removed from the device are not removed from the local source.
-`, cli.CommandHelpTemplate),
-			},
-			{
-				Name:   "usb",
-				Usage:  "Synchronizes books between local source and target device using USBMS mount",
-				Before: beforeCmdRun,
-				Flags: []cli.Flag{
-					&cli.BoolFlag{Name: "ignore-device-removals", Aliases: []string{"i"}, Usage: "do not respect books removals on the device"},
-					&cli.BoolFlag{Name: "dry-run", Usage: "do not perform any actual changes"},
-					&cli.BoolFlag{Name: "unmount", Aliases: []string{"u"}, Usage: "Attempts to prepare device for safe disconnect"},
-				},
-				Action: sync.RunUSB,
-				CustomHelpTemplate: fmt.Sprintf(`%s
-Using device storage mounted over USB syncronizes books between 'source' local directory and 'target' path on the device.
-Both could be specified in configuration file, otherwise 'source' is current working directory and 'target' is "documents/mybooks".
-Kindle device is expected to be mounted at the time of operation.
-
-When 'ignore-device-removals' flag is set, books removed from the device are not removed from the local source.
-
-With 'unmount' flag set, attempt is made to safely unmount storage after sync operation. Has no effect with 'dry-run'.
-Results of this flag are very OS dependent, for example on Windows it may fail if not all buffers have been yet written
-to storage and will fail if something still have device opened, on Linux it requires admin priviliges and will only
-unmount filesystem after mount seases to be busy, etc. Since this is command line tool this flag mostly makes sense
-on Windows, where standard way of unmounting USB media from the command line has been missing for years. On Linux
-you could simply use 'eject' or 'udisksctl' commands.
-`, cli.CommandHelpTemplate),
-			},
-			{
+		Commands: append(commands,
+			&cli.Command{
 				Name:   "mail",
 				Usage:  "Synchronizes books between local source and target device using kindle e-mail",
 				Before: beforeCmdRun,
@@ -149,7 +110,7 @@ Proper configuration is expected for succesful operation, including working smtp
 (amazon account settings).
 `, cli.CommandHelpTemplate),
 			},
-			{
+			&cli.Command{
 				Name:   "history",
 				Usage:  "Reports on local history databases",
 				Before: beforeCmdRun,
@@ -210,7 +171,7 @@ Lists local history databases specifying details for each of them.
 Use subcommands for more detailed reports.
 `, cli.CommandHelpTemplate),
 			},
-			{
+			&cli.Command{
 				Name:   "dumpconfig",
 				Usage:  "Dumps either default or active configuration (YAML)",
 				Before: beforeCmdRun,
@@ -227,7 +188,7 @@ Produces file with default configuration values.
 To see actual "active" configuration use dry-run mode.
 `, cli.CommandHelpTemplate),
 			},
-		},
+		),
 	}
 
 	err := app.Run(ctx, os.Args)
@@ -270,6 +231,10 @@ To see actual "active" configuration use dry-run mode.
 	}
 }
 
+func appName() string {
+	return strings.TrimSuffix(filepath.Base(os.Args[0]), ".exe")
+}
+
 func outputConfiguration(ctx context.Context, cmd *cli.Command) error {
 
 	env := ctx.Value(state.EnvValue).(*state.LocalEnv)
@@ -306,7 +271,7 @@ func outputConfiguration(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("unable to get configuration: %w", err)
 	}
 
-	env.Log.Info("Outputing configuration", zap.String("state", state), zap.String("file", fname))
+	env.Log.Info("Outputting configuration", zap.String("state", state), zap.String("file", fname))
 
 	_, err = out.Write(data)
 	if err != nil {
