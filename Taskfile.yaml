@@ -129,25 +129,20 @@ tasks:
       - mkdir -p '{{.REL_BUILD_DIR}}'
       - for:
           var: TARGET_RELEASES
-        task: release-for-platform
+        if: '{{with $arch := split "-" .ITEM}}{{or (and (eq $arch._0 "linux") (eq $arch._1 "amd64")) (and (eq $arch._0 "windows") (eq $arch._1 "amd64"))}}{{end}}'
+        task: release-for-platform-full
         vars:
           GOOS: '{{with $arch := split "-" .ITEM}}{{$arch._0}}{{end}}'
           GOARCH: '{{with $arch := split "-" .ITEM}}{{$arch._1}}{{end}}'
           SUFFIX: '{{with $arch := split "-" .ITEM}}{{$arch._2}}{{end}}'
-
-  release-for-platform:
-    internal: true
-    desc: Builds releases for specified platform
-    requires:
-      vars: [GOOS, GOARCH, SUFFIX]
-    label: release-for-platform-{{.GOOS}}-{{.GOARCH}}
-    cmds:
-      - if: '{{or (and (eq .GOOS "linux") (eq .GOARCH "amd64")) (and (eq .GOOS "windows") (eq .GOARCH "amd64"))}}'
-        task: release-for-platform-full
-        vars: {GOOS: '{{.GOOS}}', GOARCH: '{{.GOARCH}}', SUFFIX: '{{.SUFFIX}}'}
-      - if: '{{not (and (eq .GOOS "windows") (eq .GOARCH "amd64"))}}'
+      - for:
+          var: TARGET_RELEASES
+        if: '{{with $arch := split "-" .ITEM}}{{not (and (eq $arch._0 "windows") (eq $arch._1 "amd64"))}}{{end}}'
         task: release-for-platform-min
-        vars: {GOOS: '{{.GOOS}}', GOARCH: '{{.GOARCH}}', SUFFIX: '{{.SUFFIX}}'}
+        vars:
+          GOOS: '{{with $arch := split "-" .ITEM}}{{$arch._0}}{{end}}'
+          GOARCH: '{{with $arch := split "-" .ITEM}}{{$arch._1}}{{end}}'
+          SUFFIX: '{{with $arch := split "-" .ITEM}}{{$arch._2}}{{end}}'
 
   release-for-platform-full:
     internal: true
@@ -187,25 +182,6 @@ tasks:
       - 7z a -r -bd -bso0 -tzip {{.REL_NAME}} ./{{.BUILD_DIR}}/*
     status:
       - test -f '{{.REL_NAME}}.zip'
-
-  # release-for-platform-darwin:
-  #   internal: true
-  #   desc: Builds release for specified platform
-  #   requires:
-  #     vars: [GOOS, GOARCH, SUFFIX]
-  #   label: release-for-platform-darwin-{{.GOOS}}-{{.GOARCH}}
-  #   vars:
-  #     BUILD_DIR: '{{.REL_BUILD_DIR}}_{{.GOOS}}_{{.GOARCH}}'
-  #     REL_NAME: '{{.REL_BUILD_DIR}}/{{.PRJ_NAME}}-{{.GOOS}}-{{.GOARCH}}'
-  #   cmds:
-  #     - mkdir -p {{.BUILD_DIR}}
-  #     - defer: rm -rf {{.BUILD_DIR}}
-  #     - task: go-build
-  #       vars: {GOOS: '{{.GOOS}}', GOARCH: '{{.GOARCH}}', FLAGS: 'release', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.BUILD_DIR}}/{{.PRJ_NAME}}{{.SUFFIX}}'}
-  #     - echo "{{.TATN}}Archiving release \"{{.REL_NAME}}.zip\"{{.TOFF}}"
-  #     - 7z a -r -bd -bso0 -tzip {{.REL_NAME}} ./{{.BUILD_DIR}}/*
-  #   status:
-  #     - test -f '{{.REL_NAME}}.zip'
 
   lint:
     desc: Lints the whole project
