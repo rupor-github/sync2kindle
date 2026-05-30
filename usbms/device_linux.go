@@ -213,5 +213,8 @@ func getVolumePath(volume string) (string, error) {
 			return flds[1], nil
 		}
 	}
+	if err := sc.Err(); err != nil {
+		return "", fmt.Errorf("unable to scan mounts: %w", err)
+	}
 	return "", fmt.Errorf("unable to find mount path for volume '%s'", volume)
 }

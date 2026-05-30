@@ -102,11 +102,11 @@ func main() {
 				},
 				Action: sync.RunMail,
 				CustomHelpTemplate: fmt.Sprintf(`%s
-Using Amazon e-mail delivery syncronizes books between 'source' local directory and 'target' device.
+Using Amazon e-mail delivery synchronizes books between 'source' local directory and 'target' device.
 Both could be specified in configuration file, otherwise 'source' is current working directory and 'target' has no default.
 In this case have no way of accessing device content, so all decisions are based on local files and history.
 
-Proper configuration is expected for succesful operation, including working smtp server auth and authorized e-mail address
+Proper configuration is expected for successful operation, including working smtp server auth and authorized e-mail address
 (amazon account settings).
 `, cli.CommandHelpTemplate),
 			},

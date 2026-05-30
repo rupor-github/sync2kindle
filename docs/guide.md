@@ -67,12 +67,6 @@ Release archives are named after the binary they contain:
 
 Use `s2k` when direct USB/MTP device synchronization is needed. Use `s2km` when you only need e-mail delivery or want a portable no-CGO build for a platform where USB/MTP drivers are not available in this project.
 
-You can verify the release authenticity using [minisign](https://github.com/jedisct1/minisign) with the public key:
-
-```
-RWTNh1aN8DrXq26YRmWO3bPBx4m8jBATGXt4Z96DF4OVSzdCBmoAU+Vq
-```
-
 **Platform Notes:**
 
 - **Windows x64** - No additional dependencies required (uses COM/WPD for MTP)

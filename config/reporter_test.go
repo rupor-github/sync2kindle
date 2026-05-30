@@ -209,6 +209,9 @@ func TestManifestContainsAllEntries(t *testing.T) {
 					manifestEntries = append(manifestEntries, parts[1])
 				}
 			}
+			if err := scanner.Err(); err != nil {
+				t.Fatalf("failed to scan MANIFEST: %v", err)
+			}
 			rc.Close()
 			break
 		}

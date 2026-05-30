@@ -70,6 +70,7 @@ tasks:
       Runs available tests.
       When invoked as usual runs tests for all packages where it can find "*_test.go" files, for example: "task test".
       You can specify what tests to run by using PACKAGES environment variable, for example: "PACKAGES='./module1,./module2' task test".
+      By default tests use all build tags from ALL_BUILD_TAGS; set TAGS environment variable to override them.
       You can pass any additional parameters supported by "go test", for example: "PACKAGES='./module' task test -- -run=TestFuncPattern".
     platforms: [linux]
     deps: [generate-project-version]
@@ -85,7 +86,7 @@ tasks:
           echo
           echo "{{.TATN}}{{clean .ITEM}} tests...{{.TOFF}}"
           echo
-          go test -mod=mod -v -coverprofile='{{.TEST_DIR}}/test_{{replace "/" "_" (clean .ITEM)}}_coverage.out' {{.CLI_ARGS}} '{{.ITEM}}'
+          go test -mod=mod -tags "${TAGS-{{.ALL_BUILD_TAGS}}}" -v -coverprofile='{{.TEST_DIR}}/test_{{replace "/" "_" (clean .ITEM)}}_coverage.out' {{.CLI_ARGS}} '{{.ITEM}}'
 
   bench:
     desc: |
