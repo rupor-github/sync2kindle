@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -26,11 +27,14 @@ import (
 )
 
 type Device struct {
-	log            *zap.Logger
-	id             common.PnPDeviceID
-	pdmanager      *IPortableDeviceManager
-	clientInfo     *IPortableDeviceValues
-	pdevice        *IPortableDevice
+	log        *zap.Logger
+	id         common.PnPDeviceID
+	pdmanager  *IPortableDeviceManager
+	clientInfo *IPortableDeviceValues
+	pdevice    *IPortableDevice
+	// Disconnect uses these to make cleanup safe on partially initialized devices.
+	comInitialized bool
+	threadLocked   bool
 	availableBytes int64
 	freeBytes      int64
 	fullAccess     bool
@@ -40,16 +44,23 @@ type Device struct {
 
 // Connect to the supported device.
 func Connect(paths, serial string, _ bool, log *zap.Logger) (d *Device, err error) {
+	// COM apartments are initialized per OS thread. Keep WPD calls and CoUninitialize
+	// on the same thread that called CoInitializeEx.
+	runtime.LockOSThread()
 	defer func() {
 		if err != nil {
-			d.Disconnect()
+			if d != nil {
+				d.Disconnect()
+			} else {
+				runtime.UnlockOSThread()
+			}
 			d = nil
 		}
 	}()
 	if err := ole.CoInitializeEx(0, ole.COINIT_MULTITHREADED); err != nil {
 		return nil, err
 	}
-	d = &Device{log: log.Named(driverName)}
+	d = &Device{log: log.Named(driverName), comInitialized: true, threadLocked: true}
 	d.pdmanager, err = CreatePortableDeviceManager()
 	if err != nil {
 		return
@@ -117,7 +128,16 @@ func (d *Device) Disconnect() {
 		d.pdmanager.Release()
 		d.pdmanager = nil
 	}
-	ole.CoUninitialize()
+	// Leave the COM apartment only after every interface obtained from it is released.
+	if d.comInitialized {
+		ole.CoUninitialize()
+		d.comInitialized = false
+	}
+	// Unlock last; after this point the goroutine may migrate between OS threads again.
+	if d.threadLocked {
+		runtime.UnlockOSThread()
+		d.threadLocked = false
+	}
 }
 
 func (d *Device) UniqueID() string {
