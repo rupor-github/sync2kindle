@@ -346,7 +346,10 @@ func (d *Device) GetObjectInfos() (objects.ObjectInfoSet, error) {
 		}
 	}
 
-	infos := d.enumerateObjects(WPD_DEVICE_OBJECT_ID, "", content, properties, keysCommon, keysObjects, make([]*objects.ObjectInfo, 0))
+	infos, err := d.enumerateObjects(WPD_DEVICE_OBJECT_ID, "", content, properties, keysCommon, keysObjects, make([]*objects.ObjectInfo, 0))
+	if err != nil {
+		return nil, err
+	}
 
 	// index the results by full path, loosing target directories
 	oset := objects.New()
@@ -363,11 +366,11 @@ func (d *Device) enumerateObjects(
 	content *IPortableDeviceContent,
 	properties *IPortableDeviceProperties,
 	keysCommon, keysObjects *IPortableDeviceKeyCollection,
-	infos []*objects.ObjectInfo) []*objects.ObjectInfo {
+	infos []*objects.ObjectInfo) ([]*objects.ObjectInfo, error) {
 
 	info, err := getObjectInfo(id, properties, keysCommon, keysObjects)
 	if err != nil {
-		d.log.Warn("Unable to get values for an object, ignoring", zap.String("base", root), zap.Stringer("obj", id), zap.Error(err))
+		return nil, fmt.Errorf("unable to get values for object '%s' under '%s': %w", id, root, err)
 	}
 
 	realObj := info.Dir || info.File
@@ -389,7 +392,7 @@ func (d *Device) enumerateObjects(
 
 	// to save time we only drill down and keep objects under paths of interest
 	if !cont {
-		return infos
+		return infos, nil
 	}
 
 	if realObj {
@@ -405,21 +408,26 @@ func (d *Device) enumerateObjects(
 
 	objects, err := content.EnumObjects(0, id, nil)
 	if err != nil {
-		d.log.Warn("EnumObjects failed, ignoring", zap.String("root", root), zap.Stringer("obj", id), zap.Error(err))
-		return infos
+		return nil, fmt.Errorf("unable to enumerate children for object '%s' under '%s': %w", id, root, err)
 	}
 	defer objects.Release()
 
 	for {
 		oids, err := objects.Next(1)
-		if err != nil {
+		if errors.Is(err, io.EOF) {
 			break
 		}
+		if err != nil {
+			return nil, fmt.Errorf("unable to get next child for object '%s' under '%s': %w", id, root, err)
+		}
 		for _, oid := range oids {
-			infos = d.enumerateObjects(oid, fullPath, content, properties, keysCommon, keysObjects, infos)
+			infos, err = d.enumerateObjects(oid, fullPath, content, properties, keysCommon, keysObjects, infos)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
-	return infos
+	return infos, nil
 }
 
 func getObjectInfo(
@@ -700,7 +708,7 @@ func (d *Device) fillStorageInfo() (propSet, error) {
 			case ole.VT_CLSID:
 				guid, err := values.GetGuidValue(t.value)
 				if err != nil {
-					return nil, fmt.Errorf("failed to get guid value for '%s' from properies: %w", t.name, err)
+					return nil, fmt.Errorf("failed to get guid value for '%s' from properties: %w", t.name, err)
 				}
 				if t.actor != nil {
 					if err := t.actor(oid, &guid); err != nil {
@@ -710,7 +718,7 @@ func (d *Device) fillStorageInfo() (propSet, error) {
 			case ole.VT_LPWSTR:
 				str, err := values.GetStringValue(t.value)
 				if err != nil {
-					d.log.Warn("Failed to get string value from properies", zap.String("name", t.name), zap.Error(err))
+					d.log.Warn("Failed to get string value from properties", zap.String("name", t.name), zap.Error(err))
 					break
 				}
 				info[t.name] = str
@@ -722,7 +730,7 @@ func (d *Device) fillStorageInfo() (propSet, error) {
 			case ole.VT_UI4:
 				u, err := values.GetUnsignedIntegerValue(t.value)
 				if err != nil {
-					d.log.Warn("Failed to get unsigned integer value from properies", zap.String("name", t.name), zap.Error(err))
+					d.log.Warn("Failed to get unsigned integer value from properties", zap.String("name", t.name), zap.Error(err))
 					break
 				}
 				info[t.name] = reflect.ValueOf(u).Convert(t.toType).MethodByName("String").Call(nil)[0].Interface().(string)
@@ -734,7 +742,7 @@ func (d *Device) fillStorageInfo() (propSet, error) {
 			case ole.VT_UI8:
 				u, err := values.GetUnsignedLargeIntegerValue(t.value)
 				if err != nil {
-					d.log.Warn("Failed to get unsigned large integer value from properies", zap.String("name", t.name), zap.Error(err))
+					d.log.Warn("Failed to get unsigned large integer value from properties", zap.String("name", t.name), zap.Error(err))
 					break
 				}
 				info[t.name] = reflect.ValueOf(u).Convert(t.toType).MethodByName("String").Call(nil)[0].Interface().(string)

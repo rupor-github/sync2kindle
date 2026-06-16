@@ -3,6 +3,7 @@
 package mtp
 
 import (
+	"io"
 	"syscall"
 	"unsafe"
 
@@ -12,10 +13,15 @@ import (
 	"s2k/objects"
 )
 
+const hresultSFalse uintptr = 1
+
 func (v *IEnumPortableDeviceObjectIDs) Next(number uint32) ([]objects.ObjectID, error) {
 	pObjIDs, cObjIDs := make([]*uint16, number), int32(0)
 	hr, _, _ := syscall.SyscallN(v.VTable().Next, uintptr(unsafe.Pointer(v)),
 		uintptr(number), uintptr(unsafe.Pointer(&pObjIDs[0])), uintptr(unsafe.Pointer(&cObjIDs)))
+	if hr == hresultSFalse {
+		return nil, io.EOF
+	}
 	if hr != 0 {
 		return nil, ole.NewError(hr)
 	}
