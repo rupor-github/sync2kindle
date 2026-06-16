@@ -51,7 +51,7 @@ func (v *IPortableDeviceContent) CreateObjectWithPropertiesAndData(pValues *IPor
 		stream  *IPortableDeviceDataStream
 	)
 	hr, _, _ := syscall.SyscallN(v.VTable().CreateObjectWithPropertiesAndData, uintptr(unsafe.Pointer(v)),
-		uintptr(unsafe.Pointer(pValues)), uintptr(unsafe.Pointer(&unk)), uintptr(unsafe.Pointer(&bufsize)))
+		uintptr(unsafe.Pointer(pValues)), uintptr(unsafe.Pointer(&unk)), uintptr(unsafe.Pointer(&bufsize)), 0)
 	if hr != 0 {
 		return nil, 0, ole.NewError(hr)
 	}

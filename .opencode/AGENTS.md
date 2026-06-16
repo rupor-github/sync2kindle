@@ -13,7 +13,7 @@
 - Run all available tests: `go tool task test`.
 - Run focused tests: `PACKAGES='./sync' go tool task test -- -run=TestPrepareActions` (comma-separate multiple packages in `PACKAGES`).
 - Run staticcheck only: `go tool task lint`.
-- Cross-build Windows dev binary from Linux: `go tool task devwin`.
+- Cross-build Windows dev binary from Linux: `go tool task debug-win`.
 - Release build: `go tool task release`; release builds use `-mod=vendor`, so update `vendor/` with `go tool task vendor` after dependency changes.
 - Keep module metadata consistent for both supported targets with `go tool task tidy`; it runs `go mod tidy` for linux-amd64 and windows-amd64.
 
