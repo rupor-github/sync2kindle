@@ -11,7 +11,7 @@ permissions:
 jobs:
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
 
       - name: Ubuntu version
@@ -44,3 +44,39 @@ jobs:
           files: |-
             release/s2k-*.zip
             release/s2km-*.zip
+
+  build-darwin:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        runner: [macos-15-intel, macos-15]
+    steps:
+
+      - name: macOS version
+        run: |
+          sw_vers
+          uname -m
+
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Install additional libraries for CGO
+        run: brew install pkg-config libmtp
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Build Darwin full release
+        run: go tool task release-darwin
+
+      - name: List results
+        run: ls -lah release/
+
+      - name: Upload Darwin release
+        uses: softprops/action-gh-release@v3
+        if: github.ref_type == 'tag'
+        with:
+          generate_release_notes: true
+          files: release/s2k-darwin-*.zip

@@ -55,7 +55,7 @@ Release archives are named after the binary they contain:
 - `s2k-*` archives contain the full build with USBMS, MTP, e-mail, history and configuration commands.
 - `s2km-*` archives contain the minimal build with only e-mail, history and configuration commands.
 
-Use `s2k` on supported Windows and Linux x64 systems when direct USB/MTP device synchronization is needed. Use `s2km` when you only need e-mail delivery or want a portable no-CGO build for platforms where USB/MTP drivers are not available in this project.
+Use `s2k` on supported Windows, Linux, and macOS systems when direct USB/MTP device synchronization is needed. Use `s2km` when you only need e-mail delivery or want a portable no-CGO build.
 
 ### Supported platforms and devices
 
@@ -65,25 +65,14 @@ with PW2, PW10 and Voyage) and later ones (**Scribe, Colorsoft and latest
 Paperwhite**) are supported by **MTP** subcommand (tested with PW12). E-Mail based
 delivery should be device agnostic.
 
-Full `s2k` releases are built for Windows x64 and Linux x64. Minimal `s2km`
-releases are built for additional platforms listed on the releases page. Full
-builds were tested on fresh Windows 11 and KUbuntu 24.04 but should work on most
-64 bit Windows and Linux supported by current [Go language](https://go.dev/wiki/MinimumRequirements).
+Full `s2k` releases are built for Windows x64, Linux x64, and macOS x64/arm64.
+Minimal `s2km` releases are built for additional platforms listed on the releases
+page. Full builds were tested on fresh Windows 11, KUbuntu 24.04, and macOS 26.6
+on Apple Silicon. macOS x64 artifacts are built on GitHub's Intel macOS runners,
+but I do not have access to an Intel Mac for hardware testing.
 
-I tried to structure source code in such a way that it should be easy to port
-to other Windows or Linux architectures and it could be relatively simple to
-add drivers to support Darwin architectures too. Synchronization logic code is
-platform independent.
+Windows MTP uses native COM/WPD and does not require CGO. Linux and macOS MTP
+builds use CGO and libmtp. macOS USBMS support uses native Disk Arbitration and
+IOKit APIs.
 
-Windows build does not require CGO at all, but COM support needs to be validated for each platform build.
-
-Linux build is using CGO and libmtp (which should also work for Darwin) but USB
-discovery is OS specific and needs to be validated for each platform build.
-
-If you have a need to support something I have no way of supporting - say any
-Macs, take a look at sources and drop a PR. We could work together to
-incorporate your changes.
-
-### TODO
-
-- Support additional platforms
+Synchronization logic code is platform independent; platform-specific code is limited to device drivers.

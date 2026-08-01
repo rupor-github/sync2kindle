@@ -3,16 +3,18 @@ version: '3'
 output: 'group'
 silent: true
 
-# we are assuming that host os is always Linux
-
 vars:
   GO_VERSION_FULL: {sh: GOTOOLCHAIN=local+path go version}
   GO_VERSION: '{{regexFind "[0-9]+\\.[0-9]+\\.?[0-9]*" (regexFind "go version go[0-9]+\\.[0-9]+\\.?[0-9]*[a-zA-Z0-9]* [^/]+/.*" .GO_VERSION_FULL)}}'
+  HOST_GOOS: {sh: GOTOOLCHAIN=local+path go env GOOS}
+  HOST_GOARCH: {sh: GOTOOLCHAIN=local+path go env GOARCH}
 
   PRJ_NAME: 's2k'
   DEV_BUILD_DIR: 'build'
   REL_BUILD_DIR: 'release'
   ALL_BUILD_TAGS: 'mtp usb'
+  HOST_BUILD_TAGS: '{{if or (eq .HOST_GOOS "linux") (eq .HOST_GOOS "darwin")}}{{.ALL_BUILD_TAGS}}{{end}}'
+  HOST_CGO_ENABLED: '{{if or (eq .HOST_GOOS "linux") (eq .HOST_GOOS "darwin")}}1{{else}}0{{end}}'
 
   REF_VER: '{{regexFind "refs/tags/v[0-9]+\\.[0-9]+\\.?[0-9]*[-a-zA-Z0-9+]*" (env "GITHUB_REF")}}'
 
@@ -30,25 +32,25 @@ tasks:
   default:
     desc: Builds development version for host OS
     aliases: [debug]
-    platforms: [linux]
+    platforms: [linux, darwin]
     deps:
       - task: pre-commit-install
       - task: generate-project-version
     cmds:
       - task: go-build
-        vars: {GOOS: 'linux', GOARCH: 'amd64', CGO_ENABLED: '1', FLAGS: 'debug', TAGS: '{{.ALL_BUILD_TAGS}}', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.DEV_BUILD_DIR}}/{{.PRJ_NAME}}'}
+        vars: {GOOS: '{{.HOST_GOOS}}', GOARCH: '{{.HOST_GOARCH}}', CGO_ENABLED: '{{.HOST_CGO_ENABLED}}', FLAGS: 'debug', TAGS: '{{.HOST_BUILD_TAGS}}', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.DEV_BUILD_DIR}}/{{.PRJ_NAME}}'}
       - task: compile-all-tests
       - task: lint
 
   debug-min:
     desc: Builds minimal development version for host OS
-    platforms: [linux]
+    platforms: [linux, darwin]
     deps:
       - task: pre-commit-install
       - task: generate-project-version
     cmds:
       - task: go-build
-        vars: {GOOS: 'linux', GOARCH: 'amd64', CGO_ENABLED: '0', FLAGS: 'debug', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.DEV_BUILD_DIR}}/{{.PRJ_NAME}}m'}
+        vars: {GOOS: '{{.HOST_GOOS}}', GOARCH: '{{.HOST_GOARCH}}', CGO_ENABLED: '0', FLAGS: 'debug', PACKAGE: './cmd/{{.PRJ_NAME}}', TARGET: '{{.DEV_BUILD_DIR}}/{{.PRJ_NAME}}m'}
       - task: compile-all-tests
       - task: lint
 
@@ -70,14 +72,14 @@ tasks:
       Runs available tests.
       When invoked as usual runs tests for all packages where it can find "*_test.go" files, for example: "task test".
       You can specify what tests to run by using PACKAGES environment variable, for example: "PACKAGES='./module1,./module2' task test".
-      By default tests use all build tags from ALL_BUILD_TAGS; set TAGS environment variable to override them.
+      By default tests use the host-supported build tags; set TAGS environment variable to override them.
       You can pass any additional parameters supported by "go test", for example: "PACKAGES='./module' task test -- -run=TestFuncPattern".
-    platforms: [linux]
+    platforms: [linux, darwin]
     deps: [generate-project-version]
     vars:
       TEST_DIR: "{{.ROOT_DIR}}/{{.DEV_BUILD_DIR}}/tests_results"
       DIRS_WITH_TESTS:
-        sh: find -name '*_test.go' -printf "%h\n" | sort -u
+        sh: find . -name '*_test.go' -exec dirname {} \; | sort -u
       PACKAGES: '{{default .DIRS_WITH_TESTS (replace "," "\n" (env "PACKAGES"))}}'
     cmds:
       - mkdir -p {{.TEST_DIR}}
@@ -86,7 +88,7 @@ tasks:
           echo
           echo "{{.TATN}}{{clean .ITEM}} tests...{{.TOFF}}"
           echo
-          go test -mod=mod -tags "${TAGS-{{.ALL_BUILD_TAGS}}}" -v -coverprofile='{{.TEST_DIR}}/test_{{replace "/" "_" (clean .ITEM)}}_coverage.out' {{.CLI_ARGS}} '{{.ITEM}}'
+          go test -mod=mod -tags "${TAGS-{{.HOST_BUILD_TAGS}}}" -v -coverprofile='{{.TEST_DIR}}/test_{{replace "/" "_" (clean .ITEM)}}_coverage.out' {{.CLI_ARGS}} '{{.ITEM}}'
 
   bench:
     desc: |
@@ -99,7 +101,7 @@ tasks:
     vars:
       TEST_DIR: "{{.ROOT_DIR}}/{{.DEV_BUILD_DIR}}/tests_results"
       DIRS_WITH_TESTS:
-        sh: find -name '*_test.go' -printf "%h\n" | sort -u
+        sh: find . -name '*_test.go' -exec dirname {} \; | sort -u
       PACKAGES: '{{default .DIRS_WITH_TESTS (replace "," "\n" (env "PACKAGES"))}}'
     cmds:
       - mkdir -p {{.TEST_DIR}}
@@ -145,6 +147,15 @@ tasks:
           GOARCH: '{{with $arch := split "-" .ITEM}}{{$arch._1}}{{end}}'
           SUFFIX: '{{with $arch := split "-" .ITEM}}{{$arch._2}}{{end}}'
 
+  release-darwin:
+    desc: Builds full Darwin release for host architecture
+    platforms: [darwin]
+    deps: [generate-project-version]
+    cmds:
+      - mkdir -p '{{.REL_BUILD_DIR}}'
+      - task: release-for-platform-full
+        vars: {GOOS: 'darwin', GOARCH: '{{.HOST_GOARCH}}', SUFFIX: ''}
+
   release-for-platform-full:
     internal: true
     desc: Builds full release for specified platform
@@ -154,7 +165,7 @@ tasks:
     vars:
       BUILD_DIR: '{{.REL_BUILD_DIR}}_{{.GOOS}}_{{.GOARCH}}'
       REL_NAME: '{{.REL_BUILD_DIR}}/{{.PRJ_NAME}}-{{.GOOS}}-{{.GOARCH}}'
-      CGO: '{{if eq .GOOS "linux"}}1{{else}}0{{end}}'
+      CGO: '{{if or (eq .GOOS "linux") (eq .GOOS "darwin")}}1{{else}}0{{end}}'
     cmds:
       - mkdir -p {{.BUILD_DIR}}
       - defer: rm -rf {{.BUILD_DIR}}
@@ -186,7 +197,7 @@ tasks:
 
   lint:
     desc: Lints the whole project
-    platforms: [linux]
+    platforms: [linux, darwin]
     cmds:
       - echo "{{.TATN}}Linting project{{.TOFF}}"
       - go tool staticcheck -f stylish -tests=true ./...
@@ -202,7 +213,7 @@ tasks:
       CGO_ENABLED: '1'
     vars:
       DIRS_WITH_TESTS:
-        sh: find -name '*_test.go' -printf "%h\n" | sort -u
+        sh: find . -name '*_test.go' -exec dirname {} \; | sort -u
     cmds:
       - echo "{{.TATN}}Check compiling all available tests{{.TOFF}}"
       - for: {var: DIRS_WITH_TESTS, as: DIR}
@@ -320,10 +331,13 @@ tasks:
 
   clean:
     desc: Cleans all build release artifacts
-    platforms: [linux]
+    platforms: [linux, darwin]
     cmds:
       - rm -rfv {{.REL_BUILD_DIR}}
-      - rm -rfv {{.DEV_BUILD_DIR}}
+      - rm -fv {{.DEV_BUILD_DIR}}/{{.PRJ_NAME}}
+      - rm -fv {{.DEV_BUILD_DIR}}/{{.PRJ_NAME}}m
+      - rm -fv {{.DEV_BUILD_DIR}}/{{.PRJ_NAME}}.exe
+      - rm -rfv {{.DEV_BUILD_DIR}}/tests_results
       - rm -fv .task/checksum/*
       - rm -fv .task/timestamp/*
       - rm -fv misc/version.go
@@ -333,9 +347,9 @@ tasks:
   pre-commit-install:
     internal: true
     desc: Installs pre-commit hooks for git
-    platforms: [linux]
+    platforms: [linux, darwin]
     preconditions:
-      - sh: 'command -v "pre-commit" &> /dev/null'
+      - sh: 'command -v "pre-commit" >/dev/null 2>&1'
         msg: "pre-commit is not available - either not installed or python venv is not set properly"
     cmds:
       - pre-commit install -f
