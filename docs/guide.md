@@ -65,12 +65,13 @@ Release archives are named after the binary they contain:
 - `s2k-*` archives contain the full build with `mtp`, `usb`, `mail`, `history`, and `dumpconfig` commands.
 - `s2km-*` archives contain the minimal build with only `mail`, `history`, and `dumpconfig` commands.
 
-Use `s2k` when direct USB/MTP device synchronization is needed. Use `s2km` when you only need e-mail delivery or want a portable no-CGO build for a platform where USB/MTP drivers are not available in this project.
+Use `s2k` on supported Windows, Linux, and macOS systems when direct USB/MTP device synchronization is needed. Use `s2km` when you only need e-mail delivery or want a portable no-CGO build for a platform where USB/MTP drivers are not available in this project.
 
 **Platform Notes:**
 
 - **Windows x64** - No additional dependencies required (uses COM/WPD for MTP)
 - **Linux x64** - Requires `libmtp` installed on the system (uses CGO)
+- **macOS x64/arm64** - Requires `libmtp` installed on the system for MTP; USB uses native Disk Arbitration and IOKit APIs
 - **Minimal builds** - Do not require CGO or `libmtp`, but do not include `mtp` or `usb` commands
 
 ## Quick Start
@@ -159,7 +160,7 @@ s2k usb [options]
 - `--dry-run` - Preview changes without performing any actual operations
 - `--unmount, -u` - Attempt to safely unmount the device storage after sync
 
-**Notes on `--unmount`:** Results are OS-dependent. On Windows, it may fail if buffers haven't been flushed or if something still has the device open. On Linux, it requires admin privileges and will only unmount after the filesystem ceases to be busy. On Linux, you can use `eject` or `udisksctl` commands instead.
+**Notes on `--unmount`:** Results are OS-dependent. On Windows, it may fail if buffers haven't been flushed or if something still has the device open. On Linux, it requires admin privileges and will only unmount after the filesystem ceases to be busy. On macOS, USB unmount uses native Disk Arbitration APIs. On Linux, you can use `eject` or `udisksctl` commands instead.
 
 #### mail
 
@@ -602,7 +603,7 @@ This creates `sync2kindle-report.zip` with complete diagnostic information inclu
 **Solutions:**
 - Verify the Kindle is connected via USB and recognized by the OS
 - Check that the device is a supported model (see [Supported Kindle Devices](#supported-kindle-devices))
-- On Linux, ensure `libmtp` is installed and the device is accessible (you may need udev rules)
+- On Linux or macOS, ensure `libmtp` is installed and the device is accessible (Linux may need udev rules)
 - Try using the correct subcommand (`mtp` for newer devices, `usb` for older ones)
 - If you have multiple devices connected, use `device_serial` in configuration to target a specific one
 
@@ -633,6 +634,7 @@ This creates `sync2kindle-report.zip` with complete diagnostic information inclu
 **Solutions:**
 - On Windows, ensure no other program has the device open (File Explorer, etc.)
 - On Linux, use `eject` or `udisksctl` commands instead
+- On macOS, ensure no other application is using the mounted volume
 - Wait a moment for write buffers to flush before unmounting
 
 #### Configuration Not Working
