@@ -3,9 +3,10 @@
 package usbms
 
 import (
-	"bufio"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -20,22 +21,31 @@ import (
 
 type Device struct {
 	*files.Device
-	id    *common.PnPDeviceID
-	log   *zap.Logger
-	mount string
-	eject bool
+	id     *common.PnPDeviceID
+	log    *zap.Logger
+	volume string
+	disk   string
+	mount  string
+	eject  bool
 }
 
 // Connect to the supported device.
 func Connect(paths, serial string, eject bool, log *zap.Logger) (*Device, error) {
 
-	id, mount, err := pickDevice(serial, log)
+	id, details, err := pickDevice(serial, log)
 	if err != nil {
 		return nil, err
 	}
 
-	d := &Device{log: log.Named(driverName), id: id, mount: mount, eject: eject}
-	d.Device, err = files.Connect(paths, filepath.ToSlash(mount), nil, d.log)
+	d := &Device{
+		log:    log.Named(driverName),
+		id:     id,
+		volume: details.Volume,
+		disk:   details.Disk,
+		mount:  details.Mount,
+		eject:  eject,
+	}
+	d.Device, err = files.Connect(paths, filepath.ToSlash(details.Mount), nil, d.log)
 	if err != nil {
 		return nil, err
 	}
@@ -46,8 +56,13 @@ func Connect(paths, serial string, eject bool, log *zap.Logger) (*Device, error)
 
 func (d *Device) Disconnect() {
 	if d != nil && d.eject {
-		if err := unix.Unmount(d.mount, unix.MNT_DETACH); err != nil {
-			d.log.Error("Unable to unmount device", zap.String("mount", d.mount), zap.Error(err))
+		if err := d.unmount(); err != nil {
+			d.log.Error("Unable to unmount device",
+				zap.String("volume", d.volume),
+				zap.String("disk", d.disk),
+				zap.String("mount", d.mount),
+				zap.Error(err),
+			)
 		}
 	}
 }
@@ -63,14 +78,14 @@ func (d *Device) UniqueID() string {
 // implementation
 
 type deviceDetails struct {
-	Path, Volume, Mount string
-	Capacity            int64 // for compatibility always reported in 512 bytes blocks
+	Path, Disk, Volume, Mount string
+	Capacity                  int64 // for compatibility always reported in 512 bytes blocks
 }
 
-func pickDevice(serial string, log *zap.Logger) (*common.PnPDeviceID, string, error) {
+func pickDevice(serial string, log *zap.Logger) (*common.PnPDeviceID, *deviceDetails, error) {
 	var (
-		usbIDs *common.PnPDeviceID
-		mount  string
+		usbIDs  *common.PnPDeviceID
+		details *deviceDetails
 	)
 	if err := filepath.Walk("/sys/devices", func(usbPath string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -88,7 +103,8 @@ func pickDevice(serial string, log *zap.Logger) (*common.PnPDeviceID, string, er
 			for p, f := range map[string]func(string) error{
 				filepath.Join(devPath, "idVendor"):  common.FromSysfsNumber(&vid, 16),
 				filepath.Join(devPath, "idProduct"): common.FromSysfsNumber(&pid, 16),
-				filepath.Join(devPath, "bcdDevice"): common.FromSysfsNumber(&bcd, 16), // version as major/minor (binary coded decimal from usb descriptor)
+				// version as major/minor (binary coded decimal from usb descriptor)
+				filepath.Join(devPath, "bcdDevice"): common.FromSysfsNumber(&bcd, 16),
 				filepath.Join(devPath, "serial"):    common.FromSysfsString(&sn),
 			} {
 				if err := unix.Access(p, unix.R_OK); err != nil {
@@ -131,11 +147,11 @@ func pickDevice(serial string, log *zap.Logger) (*common.PnPDeviceID, string, er
 				return err
 			}
 
-			details, err := getVolumeDetails(devPath)
+			nextDetails, err := getVolumeDetails(devPath)
 			if err != nil {
 				return fmt.Errorf("unable to get volume details for '%s': %w", devPath, err)
 			}
-			mount = details.Mount
+			details = nextDetails
 
 			var stat unix.Statfs_t
 			if err := unix.Statfs(details.Mount, &stat); err != nil {
@@ -154,13 +170,13 @@ func pickDevice(serial string, log *zap.Logger) (*common.PnPDeviceID, string, er
 		}
 		return nil
 	}); err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 
-	if usbIDs.Empty() || len(mount) == 0 {
-		return nil, "", common.ErrNoDevice
+	if usbIDs.Empty() || details == nil || len(details.Mount) == 0 {
+		return nil, nil, common.ErrNoDevice
 	}
-	return usbIDs, mount, nil
+	return usbIDs, details, nil
 }
 
 func getVolumeDetails(root string) (*deviceDetails, error) {
@@ -176,12 +192,14 @@ func getVolumeDetails(root string) (*deviceDetails, error) {
 		if i := slices.Index(parts, "block"); i == len(parts)-2 {
 
 			// So far all Kindles have a single accessible partition.
-			part := parts[i+1] + "1"
+			disk := parts[i+1]
+			part := disk + "1"
 			dd.Path = filepath.Join(usbPath, part)
 
 			if err := common.FromSysfsNumber(&dd.Capacity, 10)(filepath.Join(dd.Path, "size")); err != nil {
 				return err
 			}
+			dd.Disk = filepath.Join("/dev", disk)
 			dd.Volume = filepath.Join("/dev", part)
 
 			var err error
@@ -199,22 +217,75 @@ func getVolumeDetails(root string) (*deviceDetails, error) {
 	return &dd, nil
 }
 
+func (d *Device) unmount() error {
+	if _, err := exec.LookPath("udisksctl"); err == nil {
+		if err := runUDisksCtl("unmount", "-b", d.volume); err != nil {
+			udisksErr := fmt.Errorf("unable to unmount volume with udisksctl: %w", err)
+			if err := d.unmountFilesystem(); err != nil {
+				return errors.Join(udisksErr, err)
+			}
+			return nil
+		}
+		if err := runUDisksCtl("power-off", "-b", d.disk); err != nil {
+			return fmt.Errorf("unable to power off disk with udisksctl: %w", err)
+		}
+		return nil
+	}
+
+	return d.unmountFilesystem()
+}
+
+func (d *Device) unmountFilesystem() error {
+	if err := unix.Unmount(d.mount, unix.MNT_DETACH); err != nil {
+		return fmt.Errorf("unable to unmount filesystem: %w", err)
+	}
+	return nil
+}
+
+func runUDisksCtl(args ...string) error {
+	cmd := exec.Command("udisksctl", args...)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		return nil
+	}
+	message := strings.TrimSpace(string(output))
+	if message == "" {
+		return err
+	}
+	return fmt.Errorf("%s: %w", message, err)
+}
+
 func getVolumePath(volume string) (string, error) {
+	var stat unix.Stat_t
+	if err := unix.Stat(volume, &stat); err != nil {
+		return "", fmt.Errorf("unable to stat volume '%s': %w", volume, err)
+	}
+	if stat.Mode&unix.S_IFMT != unix.S_IFBLK {
+		return "", fmt.Errorf("volume '%s' is not a block device", volume)
+	}
+	deviceID := fmt.Sprintf("%d:%d", unix.Major(uint64(stat.Rdev)), unix.Minor(uint64(stat.Rdev)))
+
+	mountInfo, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		return "", fmt.Errorf("unable to read mountinfo: %w", err)
+	}
+	mount, err := findVolumePathInMountInfo(mountInfo, deviceID)
+	closeErr := mountInfo.Close()
+	if err == nil {
+		return mount, nil
+	}
+	if closeErr != nil {
+		return "", fmt.Errorf("unable to close mountinfo: %w", closeErr)
+	}
+
 	mounts, err := os.Open("/proc/mounts")
 	if err != nil {
 		return "", fmt.Errorf("unable to read mounts: %w", err)
 	}
 	defer mounts.Close()
-
-	sc := bufio.NewScanner(mounts)
-	for sc.Scan() {
-		flds := strings.Fields(sc.Text())
-		if len(flds) >= 2 && flds[0] == volume {
-			return flds[1], nil
-		}
+	mount, err = findVolumePathInMounts(mounts, volume)
+	if err != nil {
+		return "", err
 	}
-	if err := sc.Err(); err != nil {
-		return "", fmt.Errorf("unable to scan mounts: %w", err)
-	}
-	return "", fmt.Errorf("unable to find mount path for volume '%s'", volume)
+	return mount, nil
 }

@@ -160,7 +160,7 @@ s2k usb [options]
 - `--dry-run` - Preview changes without performing any actual operations
 - `--unmount, -u` - Attempt to safely unmount the device storage after sync
 
-**Notes on `--unmount`:** Results are OS-dependent. On Windows, it may fail if buffers haven't been flushed or if something still has the device open. On Linux, it requires admin privileges and will only unmount after the filesystem ceases to be busy. On macOS, USB unmount uses native Disk Arbitration APIs. On Linux, you can use `eject` or `udisksctl` commands instead.
+**Notes on `--unmount`:** Results are OS-dependent. On Windows, it may fail if buffers haven't been flushed or if something still has the device open. On Linux, `udisksctl` is used when available, so it usually works without `sudo` for the active desktop user but may be denied by local polkit policy. Without `udisksctl`, Linux falls back to kernel unmount, which requires admin privileges. On macOS, USB unmount uses native Disk Arbitration APIs.
 
 #### mail
 
@@ -633,7 +633,7 @@ This creates `sync2kindle-report.zip` with complete diagnostic information inclu
 
 **Solutions:**
 - On Windows, ensure no other program has the device open (File Explorer, etc.)
-- On Linux, use `eject` or `udisksctl` commands instead
+- On Linux, ensure `udisksctl` is installed and the active desktop user is allowed by polkit
 - On macOS, ensure no other application is using the mounted volume
 - Wait a moment for write buffers to flush before unmounting
 

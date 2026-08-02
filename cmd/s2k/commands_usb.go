@@ -30,10 +30,10 @@ When 'ignore-device-removals' flag is set, books removed from the device are not
 
 With 'unmount' flag set, attempt is made to safely unmount storage after sync operation. Has no effect with 'dry-run'.
 Results of this flag are very OS dependent, for example on Windows it may fail if not all buffers have been yet written
-to storage and will fail if something still have device opened, on Linux it requires admin priviliges and will only
-unmount filesystem after mount seases to be busy, etc. Since this is command line tool this flag mostly makes sense
-on Windows, where standard way of unmounting USB media from the command line has been missing for years. On Linux
-you could simply use 'eject' or 'udisksctl' commands.
+to storage and will fail if something still has device opened. On Linux, udisksctl is used when available, so unmount
+usually works without sudo for the active desktop user but may be denied by local polkit policy. Without udisksctl,
+Linux falls back to kernel unmount, which requires admin privileges and only unmounts after mount ceases to be busy.
+On macOS, native Disk Arbitration APIs are used to unmount and eject the device.
 `, cli.CommandHelpTemplate),
 	})
 }

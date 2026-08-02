@@ -118,7 +118,7 @@ func (d *Device) Disconnect() {
 		return
 	}
 	if d.dev != nil {
-		releaseMTPDevice(d.dev)
+		disconnectMTPDevice(d.dev)
 		d.dev = nil
 	}
 }
@@ -412,6 +412,17 @@ func pickDevice(serial string, _ bool, log *zap.Logger) (usbIDs *common.PnPDevic
 		return nil, nil, common.ErrNoDevice
 	}
 	return
+}
+
+func disconnectMTPDevice(dev *C.LIBMTP_mtpdevice_t) {
+	if dev == nil {
+		return
+	}
+	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+		// On macOS and Linux, explicit final release can leave some Kindles unusable until re-plugged.
+		return
+	}
+	releaseMTPDevice(dev)
 }
 
 func releaseMTPDevice(dev *C.LIBMTP_mtpdevice_t) {

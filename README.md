@@ -67,7 +67,7 @@ delivery should be device agnostic.
 
 Full `s2k` releases are built for Windows x64, Linux x64, and macOS x64/arm64.
 Minimal `s2km` releases are built for additional platforms listed on the releases
-page. Full builds were tested on fresh Windows 11, KUbuntu 24.04, and macOS 26.6
+page. Full builds were tested on fresh Windows 11, KUbuntu 26.04, and macOS 26.6
 on Apple Silicon. macOS x64 artifacts are built on GitHub's Intel macOS runners,
 but I do not have access to an Intel Mac for hardware testing.
 
