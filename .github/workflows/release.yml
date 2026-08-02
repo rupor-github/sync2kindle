@@ -78,5 +78,5 @@ jobs:
         uses: softprops/action-gh-release@v3
         if: github.ref_type == 'tag'
         with:
-          generate_release_notes: true
+          generate_release_notes: false
           files: release/s2k-darwin-*.zip
