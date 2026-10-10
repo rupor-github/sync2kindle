@@ -15,9 +15,14 @@ import (
 )
 
 type Runner struct {
-	re    *Regexp
-	code  *syntax.Code
-	debug bool
+	re   *Regexp
+	code *syntax.Code
+
+	// Keep the byte-sized flags together to avoid padding between word-sized fields.
+	debug           bool
+	ignoreTimeout   bool
+	rightToLeft     bool
+	caseInsensitive bool
 
 	Runtextstart int // starting point for search
 
@@ -60,14 +65,11 @@ type Runner struct {
 
 	runmatch *Match // result object
 
-	ignoreTimeout bool
-	timeout       time.Duration // timeout in milliseconds (needed for actual)
-	deadline      fasttime
+	timeout  time.Duration // timeout in milliseconds (needed for actual)
+	deadline fasttime
 
-	operator        syntax.InstOp
-	codepos         int
-	rightToLeft     bool
-	caseInsensitive bool
+	operator syntax.InstOp
+	codepos  int
 }
 
 // run searches for matches and can continue from the previous match.
@@ -473,8 +475,17 @@ func executeDefault(r *Runner) error {
 			mark := r.stackPeek()
 			count := r.stackPeekN(1)
 			matched := r.textPos() - mark
+			if matched == 0 && count > 0 && r.re.options&ECMAScript != 0 {
+				// ECMAScript 2025 §22.2.2.3.1 RepeatMatcher, step 2.2,
+				// rejects an empty iteration once no required repeats remain.
+				// Fail the iteration so its captures are undone and any remaining
+				// alternatives in the body can still be tried.
+				// https://tc39.es/ecma262/2025/multipage/text-processing.html#sec-repeatmatcher
+				r.stackPush2(mark, count)
+				break
+			}
 
-			if count >= r.operand(1) || (matched == 0 && count >= 0) { // Max loops or empty match -> straight now
+			if count >= r.operand(1) || (matched == 0 && count >= 0 && r.re.options&ECMAScript == 0) { // Max loops or empty match -> straight now
 				r.trackPushNeg2(mark, count) // Save old mark, count
 				r.advance(2)                 // Straight
 			} else { // Nonempty match -> count+loop now
@@ -517,6 +528,11 @@ func executeDefault(r *Runner) error {
 			r.stackPopN(2)
 			mark := r.stackPeek()
 			count := r.stackPeekN(1)
+			if r.textPos() == mark && count > 0 && r.re.options&ECMAScript != 0 {
+				// RepeatMatcher step 2.2 applies to lazy quantifiers too.
+				r.stackPush2(mark, count)
+				break
+			}
 
 			if count < 0 { // Negative count -> loop now
 				r.trackPushNeg1(mark)                        // Save old mark
@@ -540,7 +556,9 @@ func executeDefault(r *Runner) error {
 			mark := r.trackPeek()
 			textpos := r.trackPeekN(2)
 
-			if r.trackPeekN(1) < r.operand(1) && textpos != mark { // Under limit and not empty match -> loop
+			// RepeatMatcher permits a required empty iteration, then tries
+			// another iteration; step 2.2 rejects it only if it is also empty.
+			if r.trackPeekN(1) < r.operand(1) && (textpos != mark || (r.trackPeekN(1) == 0 && r.re.options&ECMAScript != 0)) { // Under limit and another iteration is permitted
 				r.textto(textpos)                            // Recall position
 				r.stackPush2(textpos, r.trackPeekN(1)+1)     // Make new mark, incr count
 				r.trackPushNeg1(mark)                        // Save old mark
@@ -1006,7 +1024,27 @@ func executeDefault(r *Runner) error {
 			continue
 
 		default:
-			return fmt.Errorf("unknown state in regex runner: %v", r.operator)
+			// Keep resets outside the main dispatch: adding them to its cases
+			// slows existing programs that never execute a reset instruction.
+			switch r.operator {
+			case syntax.ResetCapture:
+				capnum := r.operand(0)
+				if r.runmatch.isMatched(capnum) {
+					// Use the crawl stack so lookarounds and atomic groups can
+					// undo the reset when they unwind discarded backtracking frames.
+					r.crawl(capnum)
+					r.runmatch.balanceMatch(capnum)
+					r.trackPush()
+				}
+				r.advance(1)
+				continue
+
+			case syntax.ResetCapture | syntax.Back:
+				r.uncapture()
+
+			default:
+				return fmt.Errorf("unknown state in regex runner: %v", r.operator)
+			}
 		}
 
 	BreakBackward:
@@ -1434,6 +1472,17 @@ func (r *Runner) charAt(j int) rune {
 }
 
 func findFirstCharDefault(r *Runner) bool {
+	// A fixed-length expression ending at an end anchor has at most two
+	// possible starts. Use that information before scanning a literal prefix.
+	if opts := r.code.FindOptimizations; opts != nil {
+		switch opts.FindMode {
+		case syntax.TrailingAnchor_FixedLength_LeftToRight_End:
+			return findTrailingFixedLengthEnd(r, opts.MinRequiredLength, false)
+		case syntax.TrailingAnchor_FixedLength_LeftToRight_EndZ:
+			return findTrailingFixedLengthEnd(r, opts.MinRequiredLength, true)
+		}
+	}
+
 	if 0 != (r.code.Anchors & (syntax.AnchorBeginning | syntax.AnchorStart | syntax.AnchorEndZ | syntax.AnchorEnd)) {
 		if !r.code.RightToLeft {
 			if (0 != (r.code.Anchors&syntax.AnchorBeginning) && r.Runtextpos > 0) ||
@@ -1523,6 +1572,7 @@ func shouldUseFindFirstCharOptimized(r *Runner) bool {
 	opts := r.code.FindOptimizations
 	switch opts.FindMode {
 	case syntax.TrailingAnchor_FixedLength_LeftToRight_End,
+		syntax.TrailingAnchor_FixedLength_LeftToRight_EndZ,
 		syntax.LeadingString_OrdinalIgnoreCase_LeftToRight,
 		syntax.LeadingStrings_LeftToRight,
 		syntax.LeadingStrings_OrdinalIgnoreCase_LeftToRight,
@@ -1554,12 +1604,23 @@ func findFirstCharOptimized(r *Runner) (handled bool, found bool) {
 	case syntax.NoSearch:
 		return false, false
 	case syntax.TrailingAnchor_FixedLength_LeftToRight_End:
-		return true, findTrailingFixedLengthEnd(r, opts.MinRequiredLength)
+		return true, findTrailingFixedLengthEnd(r, opts.MinRequiredLength, false)
+	case syntax.TrailingAnchor_FixedLength_LeftToRight_EndZ:
+		return true, findTrailingFixedLengthEnd(r, opts.MinRequiredLength, true)
 	case syntax.LeadingString_LeftToRight:
 		return true, findLeadingStringLeftToRight(r, []rune(opts.LeadingPrefix), false)
 	case syntax.LeadingString_OrdinalIgnoreCase_LeftToRight:
 		return true, findLeadingStringLeftToRight(r, []rune(opts.LeadingPrefix), true)
 	case syntax.LeadingStrings_LeftToRight:
+		if r.re != nil && r.re.prefixSearch != nil && r.re.prefixSearch.shouldUseRunes(r.Runtext, r.Runtextpos) {
+			start := r.re.prefixSearch.indexRunes(r.Runtext, r.Runtextpos)
+			if start >= 0 && hasRequiredLengthAt(r, start) {
+				r.Runtextpos = start
+				return true, true
+			}
+			r.Runtextpos = r.Runtextend
+			return true, false
+		}
 		return true, findLeadingStringsLeftToRight(r, opts.LeadingPrefixesRunes, opts.LeadingPrefixFirstRunes, false)
 	case syntax.LeadingStrings_OrdinalIgnoreCase_LeftToRight:
 		return true, findLeadingStringsLeftToRight(r, opts.LeadingPrefixesRunes, opts.LeadingPrefixFirstRunes, true)
@@ -1578,9 +1639,25 @@ func findFirstCharOptimized(r *Runner) (handled bool, found bool) {
 	}
 }
 
-func findTrailingFixedLengthEnd(r *Runner, fixedLength int) bool {
+func findTrailingFixedLengthEnd(r *Runner, fixedLength int, allowFinalNewline bool) bool {
 	start := r.Runtextend - fixedLength
 	if start < r.Runtextpos || start < 0 {
+		r.Runtextpos = r.Runtextend
+		return false
+	}
+	// Prefer the position before a final newline when allowed by the anchor.
+	// A rejected prefix must still allow the absolute-end candidate: the
+	// expression itself may consume the newline.
+	prefix := r.code.BmPrefix
+	if allowFinalNewline && r.Runtextend > 0 && r.Runtext[r.Runtextend-1] == '\n' && start-1 >= r.Runtextpos {
+		if prefix == nil || prefix.IsMatch(r.Runtext, start-1, 0, r.Runtextend) {
+			r.Runtextpos = start - 1
+			return true
+		}
+	}
+	// Retain the literal prefilter when narrowing the search to the end.
+	// Otherwise even a first-character mismatch would enter the interpreter.
+	if prefix != nil && !prefix.IsMatch(r.Runtext, start, 0, r.Runtextend) {
 		r.Runtextpos = r.Runtextend
 		return false
 	}
@@ -1928,6 +2005,17 @@ func isASCIIRunes(in []rune) bool {
 }
 
 func indexOfSet(chars []rune, set syntax.FixedDistanceSet) int {
+	if len(set.Chars) > 5 && set.Set != nil {
+		// The class already has an ASCII bitmap. Avoid constructing another
+		// one each time a candidate search resumes, and keep Unicode handling
+		// and negation in the class's membership test.
+		for i, ch := range chars {
+			if set.Set.Contains(ch) {
+				return i
+			}
+		}
+		return -1
+	}
 	if len(set.Chars) > 0 && !set.Negated {
 		return helpers.IndexOfAny(chars, set.Chars)
 	}
@@ -1956,6 +2044,9 @@ func fixedDistanceSetsMatchAt(r *Runner, sets []syntax.FixedDistanceSet, start i
 }
 
 func charInFixedDistanceSet(set syntax.FixedDistanceSet, ch rune) bool {
+	if len(set.Chars) > 5 && set.Set != nil {
+		return set.Set.Contains(ch)
+	}
 	if len(set.Chars) > 0 {
 		found := slices.Contains(set.Chars, ch)
 		if set.Negated {
@@ -2074,6 +2165,14 @@ func (r *Runner) Capture(capnum, start, end int) {
 
 	r.crawl(capnum)
 	r.runmatch.addMatch(capnum, start, end-start)
+}
+
+// TransferCapture removes the last capture from uncapnum and optionally
+// captures its interval with [start, end) into capnum. Use -1 for capnum to
+// only remove the capture. uncapnum must be matched, and both group numbers
+// must already be mapped to dense capture slots. UncaptureUntil can undo it.
+func (r *Runner) TransferCapture(capnum, uncapnum, start, end int) {
+	r.transferCapture(capnum, uncapnum, start, end)
 }
 
 // transferCapture captures a subexpression. Note that the
