@@ -44,6 +44,8 @@ performance and added flexibility.
 
 [User guide](docs/guide.md)
 
+[Contributing guidelines](CONTRIBUTING.md)
+
 [Russian discussion forum](https://4pda.to/forum/index.php?showtopic=942250#)
 
 ### Installation
