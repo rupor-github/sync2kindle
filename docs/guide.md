@@ -572,7 +572,7 @@ This ensures that sideloaded books display proper cover art in the Kindle librar
 
 **Supported thumbnail sources:**
 - **MOBI/AZW3** - Cover extracted from EXTH records in the PDB header
-- **KFX** - Cover extracted from the Amazon Ion binary container format
+- **KFX** - Cover extracted from raw Amazon Ion binary containers and unencrypted plaintext or LZMA-compressed KFX envelopes, including compressed output from fb2cng. Encrypted books and inner container/entity compression are not supported for thumbnail extraction. Books are copied unchanged regardless of thumbnail extraction support.
 
 Thumbnails are only processed when the `system/thumbnails` directory is accessible on the device (USB and MTP connections only, not email).
 

@@ -6,6 +6,7 @@ package kfx
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"image"
@@ -18,6 +19,7 @@ import (
 	"go.uber.org/zap"
 
 	"s2k/thumbs/imgutils"
+	"s2k/thumbs/kfx/internal/envelope"
 )
 
 type Reader struct {
@@ -48,6 +50,18 @@ func NewReader(fname string, w, h int, log *zap.Logger) (*Reader, error) {
 	data, err := os.ReadFile(fname)
 	if err != nil {
 		return nil, err
+	}
+
+	if envelope.IsEnvelope(data) {
+		ctx := context.Background()
+		e, err := envelope.Inspect(ctx, data)
+		if err != nil {
+			return nil, fmt.Errorf("inspect KFX envelope: %w", err)
+		}
+		data, err = e.Decode(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("decode KFX envelope: %w", err)
+		}
 	}
 
 	r = &Reader{fname: fname, width: w, height: h}

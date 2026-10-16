@@ -14,6 +14,7 @@ require (
 	github.com/go-playground/validator/v10 v10.30.5
 	github.com/gosimple/slug v1.15.0
 	github.com/rupor-github/gencfg v1.0.18
+	github.com/ulikunitz/xz v0.5.17
 	github.com/urfave/cli/v3 v3.14.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/image v0.47.0
@@ -127,7 +128,6 @@ require (
 	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/u-root/u-root v0.16.0 // indirect
 	github.com/u-root/uio v0.0.0-20240224005618-d2acac8f3701 // indirect
-	github.com/ulikunitz/xz v0.5.17 // indirect
 	github.com/xo/terminfo v1.2.0 // indirect
 	github.com/zeebo/assert v1.3.1 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect

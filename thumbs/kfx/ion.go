@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/amazon-ion/ion-go/ion"
 )
@@ -61,7 +62,9 @@ func decodeIon(prolog, data []byte, v any) error {
 	if len(data) < len(ionBVM) {
 		return fmt.Errorf("ion data too short: got %d bytes, need at least %d", len(data), len(ionBVM))
 	}
-	if err := ion.Unmarshal(append(prolog, data[len(ionBVM):]...), v, sharedSymbolTable); err != nil {
+	// The prolog may be a slice into the book. Do not overwrite adjacent entities
+	// or index entries when replacing the payload's binary version marker.
+	if err := ion.Unmarshal(slices.Concat(prolog, data[len(ionBVM):]), v, sharedSymbolTable); err != nil {
 		return err
 	}
 	if val, ok := v.(interface{ validate() error }); ok {
